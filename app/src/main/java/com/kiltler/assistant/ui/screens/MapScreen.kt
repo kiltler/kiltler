@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.data.WorkPlace
 import com.kiltler.assistant.ui.GeocodeResult
+import com.kiltler.assistant.ui.KhabarovskRegion
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDate
 import com.kiltler.assistant.ui.formatDateTime
@@ -83,10 +84,10 @@ fun MapScreen(
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             setUseDataConnection(true)
-            controller.setZoom(11.0)
+            controller.setZoom(12.0)
             val start = workPlaces.firstOrNull()
                 ?.let { GeoPoint(it.latitude, it.longitude) }
-                ?: GeoPoint(55.751244, 37.618423)
+                ?: GeoPoint(KhabarovskRegion.CENTER_LAT, KhabarovskRegion.CENTER_LON)
             controller.setCenter(start)
 
             val receiver = object : MapEventsReceiver {
