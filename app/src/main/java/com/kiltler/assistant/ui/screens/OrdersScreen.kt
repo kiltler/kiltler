@@ -4,24 +4,33 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Plumbing
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -39,9 +48,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,7 +65,30 @@ import com.kiltler.assistant.ui.SectionHeader
 import com.kiltler.assistant.ui.StatusBadge
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDateTime
+import com.kiltler.assistant.ui.geocodeAddress
 import com.kiltler.assistant.ui.pickDateTime
+import kotlinx.coroutines.launch
+
+/** Виды работ по заказу — можно выбрать несколько одновременно. */
+enum class WorkType(val label: String, val icon: ImageVector) {
+    CLEANING("Чистка", Icons.Default.CleaningServices),
+    REFILL("Заправка", Icons.Default.Colorize),
+    INSTALL("Установка", Icons.Default.Build),
+    PRE_INSTALL("Закладка", Icons.Default.Plumbing),
+    SALE("Продажа", Icons.Default.Sell);
+
+    companion object {
+        /** Разбирает поле описания заказа в список выбранных видов работ. */
+        fun parse(raw: String): List<WorkType> {
+            val parts = raw.split(",").map { it.trim() }
+            return entries.filter { it.label in parts }
+        }
+
+        /** Собирает строку для хранения в поле описания заказа. */
+        fun join(types: Collection<WorkType>): String =
+            entries.filter { it in types }.joinToString(", ") { it.label }
+    }
+}
 
 @Composable
 fun OrdersScreen(
@@ -119,6 +153,7 @@ fun OrdersScreen(
 private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
     val status = OrderStatus.from(order.status)
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -140,7 +175,11 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
             if (order.scheduledMillis != null) {
                 InfoLine(Icons.Default.Schedule, formatDateTime(order.scheduledMillis))
             }
-            if (order.description.isNotBlank()) {
+
+            val workTypes = WorkType.parse(order.description)
+            if (workTypes.isNotEmpty()) {
+                WorkTypeChips(workTypes)
+            } else if (order.description.isNotBlank()) {
                 Text(
                     order.description,
                     style = MaterialTheme.typography.bodySmall,
@@ -150,6 +189,7 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
+
             if (order.price > 0) {
                 Text(
                     "Сумма: ${formatMoney(order.price)} ₽",
@@ -159,30 +199,50 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-            if (order.phone.isNotBlank() || order.address.isNotBlank()) {
-                Row(
-                    modifier = Modifier.padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+
+            if (order.phone.isNotBlank()) {
+                FilledTonalButton(
+                    onClick = { dialPhone(context, order.phone) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
-                    if (order.phone.isNotBlank()) {
-                        FilledTonalButton(
-                            onClick = { dialPhone(context, order.phone) },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Call, contentDescription = null)
-                            Text("  Позвонить")
-                        }
-                    }
-                    if (order.address.isNotBlank()) {
-                        FilledTonalButton(
-                            onClick = { routeToAddress(context, order.address) },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Navigation, contentDescription = null)
-                            Text("  Маршрут")
-                        }
-                    }
+                    Icon(Icons.Default.Call, contentDescription = null)
+                    Text("  Позвонить")
                 }
+            }
+            if (order.address.isNotBlank()) {
+                FilledTonalButton(
+                    onClick = { scope.launch { routeToAddress(context, order.address) } },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                ) {
+                    Icon(Icons.Default.Navigation, contentDescription = null)
+                    Text("  Маршрут")
+                }
+            }
+        }
+    }
+}
+
+/** Перечень видов работ в карточке заказа — иконка плюс название. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WorkTypeChips(types: List<WorkType>) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(top = 6.dp)
+    ) {
+        types.forEach { type ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    type.icon, contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    " ${type.label}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -199,24 +259,41 @@ private fun dialPhone(context: Context, phone: String) {
     }
 }
 
-/** Строит маршрут до адреса заказа в Яндекс Картах (или в браузере, если приложения нет). */
-private fun routeToAddress(context: Context, address: String) {
-    val encoded = Uri.encode(address.trim())
-    val appUri = Uri.parse("yandexmaps://maps.yandex.ru/?rtext=~$encoded&rtt=auto")
-    val webUri = Uri.parse("https://yandex.ru/maps/?rtext=~$encoded&rtt=auto")
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, appUri))
-    } catch (e: Exception) {
+/**
+ * Геокодирует адрес заказа в координаты и строит маршрут:
+ * Яндекс Навигатор → Яндекс Карты → браузер.
+ */
+private suspend fun routeToAddress(context: Context, address: String) {
+    val geo = geocodeAddress(context, address)
+    val targets = if (geo != null) {
+        listOf(
+            "yandexnavi://build_route_on_map?lat_to=${geo.latitude}&lon_to=${geo.longitude}",
+            "yandexmaps://maps.yandex.ru/?rtext=~${geo.latitude},${geo.longitude}&rtt=auto",
+            "https://yandex.ru/maps/?rtext=~${geo.latitude},${geo.longitude}&rtt=auto"
+        )
+    } else {
+        val encoded = Uri.encode(address.trim())
+        listOf(
+            "yandexmaps://maps.yandex.ru/?rtext=~$encoded&rtt=auto",
+            "https://yandex.ru/maps/?text=$encoded"
+        )
+    }
+    for (uri in targets) {
         try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, webUri))
-        } catch (e2: Exception) {
-            Toast.makeText(context, "Не удалось открыть Яндекс Карты", Toast.LENGTH_SHORT).show()
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(uri))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            return
+        } catch (e: Exception) {
+            // приложение не найдено — пробуем следующий вариант
         }
     }
+    Toast.makeText(context, "Не удалось построить маршрут", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
-private fun InfoLine(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+private fun InfoLine(icon: ImageVector, text: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(top = 3.dp)
@@ -235,6 +312,7 @@ private fun InfoLine(icon: androidx.compose.ui.graphics.vector.ImageVector, text
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OrderDialog(
     initial: Order?,
@@ -245,12 +323,14 @@ private fun OrderDialog(
     var client by remember { mutableStateOf(initial?.clientName ?: "") }
     var phone by remember { mutableStateOf((initial?.phone ?: "").ifBlank { PHONE_PREFIX }) }
     var address by remember { mutableStateOf(initial?.address ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var workTypes by remember {
+        mutableStateOf(WorkType.parse(initial?.description ?: "").toSet())
+    }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
     var status by remember { mutableStateOf(OrderStatus.from(initial?.status ?: OrderStatus.NEW.name)) }
     var scheduled by remember { mutableStateOf(initial?.scheduledMillis) }
     var reminderEnabled by remember { mutableStateOf(initial?.reminderEnabled ?: true) }
-    val scroll = androidx.compose.foundation.rememberScrollState()
+    val scroll = rememberScrollState()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -260,60 +340,77 @@ private fun OrderDialog(
                 modifier = Modifier.androidVerticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                    VoiceTextField(client, { client = it }, "Клиент", Modifier.fillMaxWidth())
-                    OutlinedTextField(
-                        value = phone,
-                        onValueChange = { phone = formatPhone(it) },
-                        label = { Text("Телефон") },
-                        supportingText = { Text("Формат: +7 и 10 цифр") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    VoiceTextField(address, { address = it }, "Адрес", Modifier.fillMaxWidth())
-                    VoiceTextField(
-                        description, { description = it }, "Описание работ",
-                        Modifier.fillMaxWidth(), singleLine = false, minLines = 2
-                    )
-                    OutlinedTextField(
-                        value = priceText,
-                        onValueChange = { priceText = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
-                        label = { Text("Сумма, ₽") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                VoiceTextField(client, { client = it }, "Клиент", Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = formatPhone(it) },
+                    label = { Text("Телефон") },
+                    supportingText = { Text("Формат: +7 и 10 цифр") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                VoiceTextField(address, { address = it }, "Адрес", Modifier.fillMaxWidth())
 
-                    SectionHeader("Статус")
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(OrderStatus.entries) { s ->
-                            FilterChip(
-                                selected = status == s,
-                                onClick = { status = s },
-                                label = { Text(s.label) }
-                            )
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            pickDateTime(context, scheduled ?: System.currentTimeMillis()) {
-                                scheduled = it
+                SectionHeader("Виды работ")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WorkType.entries.forEach { type ->
+                        FilterChip(
+                            selected = type in workTypes,
+                            onClick = {
+                                workTypes = if (type in workTypes) workTypes - type
+                                else workTypes + type
+                            },
+                            label = { Text(type.label) },
+                            leadingIcon = {
+                                Icon(
+                                    type.icon, contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Schedule, contentDescription = null)
-                        Text("  " + (scheduled?.let { formatDateTime(it) } ?: "Дата выезда не задана"))
-                    }
-                    if (scheduled != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
-                            Text("  Напомнить о заказе", style = MaterialTheme.typography.bodyMedium)
-                            TextButton(onClick = { scheduled = null }) { Text("Убрать дату") }
-                        }
+                        )
                     }
                 }
+
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                    label = { Text("Сумма, ₽") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                SectionHeader("Статус")
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(OrderStatus.entries) { s ->
+                        FilterChip(
+                            selected = status == s,
+                            onClick = { status = s },
+                            label = { Text(s.label) }
+                        )
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        pickDateTime(context, scheduled ?: System.currentTimeMillis()) {
+                            scheduled = it
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Schedule, contentDescription = null)
+                    Text("  " + (scheduled?.let { formatDateTime(it) } ?: "Дата выезда не задана"))
+                }
+                if (scheduled != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
+                        Text("  Напомнить о заказе", style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = { scheduled = null }) { Text("Убрать дату") }
+                    }
+                }
+            }
         },
         confirmButton = {
             TextButton(
@@ -328,7 +425,7 @@ private fun OrderDialog(
                                 clientName = client.trim(),
                                 phone = phoneClean,
                                 address = address.trim(),
-                                description = description.trim(),
+                                description = WorkType.join(workTypes),
                                 price = price,
                                 status = status.name,
                                 scheduledMillis = scheduled,
