@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
@@ -269,7 +270,7 @@ private fun OrderDialog(
 }
 
 private fun Modifier.androidVerticalScroll(state: androidx.compose.foundation.ScrollState): Modifier =
-    this.then(androidx.compose.foundation.verticalScroll(state))
+    this.verticalScroll(state)
 
 private fun formatMoney(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
