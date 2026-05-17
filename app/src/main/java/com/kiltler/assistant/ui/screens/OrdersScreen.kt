@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WorkOutline
@@ -158,13 +159,29 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-            if (order.phone.isNotBlank()) {
-                FilledTonalButton(
-                    onClick = { dialPhone(context, order.phone) },
-                    modifier = Modifier.padding(top = 8.dp)
+            if (order.phone.isNotBlank() || order.address.isNotBlank()) {
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.Call, contentDescription = null)
-                    Text("  Позвонить")
+                    if (order.phone.isNotBlank()) {
+                        FilledTonalButton(
+                            onClick = { dialPhone(context, order.phone) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Call, contentDescription = null)
+                            Text("  Позвонить")
+                        }
+                    }
+                    if (order.address.isNotBlank()) {
+                        FilledTonalButton(
+                            onClick = { routeToAddress(context, order.address) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Navigation, contentDescription = null)
+                            Text("  Маршрут")
+                        }
+                    }
                 }
             }
         }
@@ -179,6 +196,22 @@ private fun dialPhone(context: Context, phone: String) {
         )
     } catch (e: Exception) {
         Toast.makeText(context, "Не удалось открыть набор номера", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Строит маршрут до адреса заказа в Яндекс Картах (или в браузере, если приложения нет). */
+private fun routeToAddress(context: Context, address: String) {
+    val encoded = Uri.encode(address.trim())
+    val appUri = Uri.parse("yandexmaps://maps.yandex.ru/?rtext=~$encoded&rtt=auto")
+    val webUri = Uri.parse("https://yandex.ru/maps/?rtext=~$encoded&rtt=auto")
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, appUri))
+    } catch (e: Exception) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, webUri))
+        } catch (e2: Exception) {
+            Toast.makeText(context, "Не удалось открыть Яндекс Карты", Toast.LENGTH_SHORT).show()
+        }
     }
 }
 
