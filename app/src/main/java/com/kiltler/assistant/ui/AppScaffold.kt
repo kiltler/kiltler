@@ -187,6 +187,7 @@ fun AppScaffold() {
                     Tab.MAP -> MapScreen(
                         workPlaces = workPlaces,
                         onSave = vm::saveWorkPlace,
+                        onSaveReminder = vm::saveReminder,
                         onDelete = vm::deleteWorkPlace
                     )
                 }
