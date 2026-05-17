@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import com.kiltler.assistant.data.Order
@@ -118,6 +119,8 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
                     order.clientName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 StatusBadge(status.label, status.color)
@@ -135,6 +138,8 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
                     order.description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
@@ -162,7 +167,12 @@ private fun InfoLine(icon: androidx.compose.ui.graphics.vector.ImageVector, text
             modifier = Modifier.padding(end = 6.dp),
             tint = MaterialTheme.colorScheme.primary
         )
-        Text(text, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kiltler.assistant.data.Material
 import com.kiltler.assistant.ui.VoiceTextField
@@ -94,14 +95,17 @@ private fun LowStockBanner(count: Int) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
             Text(
-                "  Заканчивается материалов: $count — нужно пополнить",
+                "Заканчивается материалов: $count",
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -131,19 +135,29 @@ private fun MaterialCard(
                     .weight(1f)
                     .clickable(onClick = onClick)
             ) {
-                Text(material.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    material.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(
                     "Остаток: ${formatNum(material.quantity)} ${material.unit}" +
                         "  •  мин. ${formatNum(material.minQuantity)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (material.isLow) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (material.note.isNotBlank()) {
                     Text(
                         material.note,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -204,7 +218,7 @@ private fun MaterialDialog(
                 OutlinedTextField(
                     value = minQuantity,
                     onValueChange = { minQuantity = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
-                    label = { Text("Минимальный остаток (для предупреждения)") },
+                    label = { Text("Мин. остаток") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
