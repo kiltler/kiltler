@@ -102,7 +102,9 @@ fun OrdersScreen(
     onEdit: (Order) -> Unit
 ) {
     var filter by remember { mutableStateOf<OrderStatus?>(null) }
-    val visible = orders.filter { filter == null || it.status == filter!!.name }
+    val visible = orders
+        .filter { filter == null || it.status == filter!!.name }
+        .sortedWith(compareBy(nullsLast<Long>()) { it.scheduledMillis })
 
     Column(modifier = Modifier.fillMaxSize()) {
         LazyRow(
