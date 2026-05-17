@@ -210,7 +210,7 @@ private fun OrderDialog(
 ) {
     val context = LocalContext.current
     var client by remember { mutableStateOf(initial?.clientName ?: "") }
-    var phone by remember { mutableStateOf(initial?.phone ?: "") }
+    var phone by remember { mutableStateOf((initial?.phone ?: "").ifBlank { PHONE_PREFIX }) }
     var address by remember { mutableStateOf(initial?.address ?: "") }
     var description by remember { mutableStateOf(initial?.description ?: "") }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
@@ -229,8 +229,10 @@ private fun OrderDialog(
             ) {
                     VoiceTextField(client, { client = it }, "Клиент", Modifier.fillMaxWidth())
                     OutlinedTextField(
-                        value = phone, onValueChange = { phone = it },
+                        value = phone,
+                        onValueChange = { phone = formatPhone(it) },
                         label = { Text("Телефон") },
+                        supportingText = { Text("Формат: +7 и 10 цифр") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier.fillMaxWidth()
@@ -285,10 +287,13 @@ private fun OrderDialog(
                 onClick = {
                     if (client.isNotBlank()) {
                         val price = priceText.replace(',', '.').replace(" ", "").toDoubleOrNull() ?: 0.0
+                        val phoneClean = phone
+                            .takeIf { it.removePrefix(PHONE_PREFIX).any(Char::isDigit) }
+                            ?.trim() ?: ""
                         onSave(
                             (initial ?: Order(clientName = "")).copy(
                                 clientName = client.trim(),
-                                phone = phone.trim(),
+                                phone = phoneClean,
                                 address = address.trim(),
                                 description = description.trim(),
                                 price = price,
@@ -307,6 +312,17 @@ private fun OrderDialog(
 
 private fun Modifier.androidVerticalScroll(state: androidx.compose.foundation.ScrollState): Modifier =
     this.verticalScroll(state)
+
+private const val PHONE_PREFIX = "+7"
+
+/** Удерживает префикс +7 и оставляет под ввод не более 10 цифр. */
+private fun formatPhone(input: String): String {
+    var digits = input.removePrefix(PHONE_PREFIX).filter { it.isDigit() }
+    if (digits.length > 10 && (digits.startsWith("7") || digits.startsWith("8"))) {
+        digits = digits.drop(1)
+    }
+    return PHONE_PREFIX + digits.take(10)
+}
 
 private fun formatMoney(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
