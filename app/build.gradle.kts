@@ -64,7 +64,7 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
+    implementation("com.yandex.android:maps.mobile:4.33.1-full")
     implementation("com.google.code.gson:gson:2.11.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

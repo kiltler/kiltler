@@ -3,7 +3,7 @@
 Гайд по сборке и запуску этого проекта в Android Studio.
 
 Приложение написано на **Kotlin + Jetpack Compose**, использует базу
-данных **Room**, карты **osmdroid** и локальные уведомления.
+данных **Room**, карты **Yandex MapKit** и локальные уведомления.
 
 ## 1. Требования
 
@@ -50,7 +50,7 @@ cd kiltler
 ## 4. Синхронизация проекта (Gradle Sync)
 
 При первом открытии Android Studio запустит **Gradle Sync** — скачает
-Gradle 8.9 и все зависимости (Compose, Room, osmdroid, gson).
+Gradle 8.11.1 и все зависимости (Compose, Room, Yandex MapKit, gson).
 
 - Дождитесь сообщения **"Gradle sync finished"**.
 - Если синхронизация не стартовала — нажмите

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.kiltler.assistant.ui.AppScaffold
 import com.kiltler.assistant.ui.theme.AssistantTheme
+import com.yandex.mapkit.MapKitFactory
 
 class MainActivity : ComponentActivity() {
 
@@ -22,6 +23,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        MapKitFactory.initialize(this)
         enableEdgeToEdge()
         requestNotificationPermission()
 
@@ -32,6 +34,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        MapKitFactory.getInstance().onStart()
+    }
+
+    override fun onStop() {
+        MapKitFactory.getInstance().onStop()
+        super.onStop()
     }
 
     private fun requestNotificationPermission() {

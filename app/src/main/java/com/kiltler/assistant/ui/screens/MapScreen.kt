@@ -1,7 +1,12 @@
 package com.kiltler.assistant.ui.screens
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.PointF
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -13,9 +18,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -45,6 +53,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.kiltler.assistant.R
 import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.data.WorkPlace
 import com.kiltler.assistant.ui.GeocodeResult
@@ -55,15 +64,25 @@ import com.kiltler.assistant.ui.formatDateTime
 import com.kiltler.assistant.ui.geocodeAddress
 import com.kiltler.assistant.ui.pickDateTime
 import com.kiltler.assistant.ui.rememberVoiceInput
+import com.yandex.mapkit.Animation
+import com.yandex.mapkit.MapKitFactory
+import com.yandex.mapkit.RequestPoint
+import com.yandex.mapkit.RequestPointType
+import com.yandex.mapkit.directions.DirectionsFactory
+import com.yandex.mapkit.directions.driving.DrivingOptions
+import com.yandex.mapkit.directions.driving.DrivingRoute
+import com.yandex.mapkit.directions.driving.DrivingRouterType
+import com.yandex.mapkit.directions.driving.DrivingSession
+import com.yandex.mapkit.directions.driving.VehicleOptions
+import com.yandex.mapkit.geometry.Point
+import com.yandex.mapkit.map.CameraPosition
+import com.yandex.mapkit.map.IconStyle
+import com.yandex.mapkit.map.InputListener
+import com.yandex.mapkit.map.Map
+import com.yandex.mapkit.map.MapObjectTapListener
+import com.yandex.mapkit.mapview.MapView
+import com.yandex.runtime.image.ImageProvider
 import kotlinx.coroutines.launch
-import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.MapEventsOverlay
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 @Composable
 fun MapScreen(
@@ -75,58 +94,109 @@ fun MapScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    var pendingPoint by remember { mutableStateOf<GeoPoint?>(null) }
+    var pendingPoint by remember { mutableStateOf<Point?>(null) }
     var selectedPlace by remember { mutableStateOf<WorkPlace?>(null) }
     var voiceAddress by remember { mutableStateOf<String?>(null) }
+    var routeActive by remember { mutableStateOf(false) }
 
-    val mapView = remember {
-        MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            setUseDataConnection(true)
-            controller.setZoom(12.0)
-            val start = workPlaces.firstOrNull()
-                ?.let { GeoPoint(it.latitude, it.longitude) }
-                ?: GeoPoint(KhabarovskRegion.CENTER_LAT, KhabarovskRegion.CENTER_LON)
-            controller.setCenter(start)
+    val mapView = remember { MapView(context) }
+    val map = remember { mapView.mapWindow.map }
+    val placemarks = remember { map.mapObjects.addCollection() }
+    val routes = remember { map.mapObjects.addCollection() }
+    val userLocationLayer = remember {
+        MapKitFactory.getInstance().createUserLocationLayer(mapView.mapWindow).apply {
+            setVisible(true)
+        }
+    }
+    val drivingRouter = remember {
+        DirectionsFactory.getInstance().createDrivingRouter(DrivingRouterType.COMBINED)
+    }
+    val pinIcon = remember { pinImageProvider(context) }
+    var drivingSession by remember { mutableStateOf<DrivingSession?>(null) }
 
-            val receiver = object : MapEventsReceiver {
-                override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
-                override fun longPressHelper(p: GeoPoint?): Boolean {
-                    if (p != null) pendingPoint = p
-                    return true
+    val placemarkTapListener = remember {
+        MapObjectTapListener { mapObject, _ ->
+            (mapObject.userData as? WorkPlace)?.let { selectedPlace = it }
+            true
+        }
+    }
+    val inputListener = remember {
+        object : InputListener {
+            override fun onMapTap(map: Map, point: Point) = Unit
+            override fun onMapLongTap(map: Map, point: Point) {
+                pendingPoint = point
+            }
+        }
+    }
+    val routeListener = remember {
+        object : DrivingSession.DrivingRouteListener {
+            override fun onDrivingRoutes(drivingRoutes: MutableList<DrivingRoute>) {
+                routes.clear()
+                drivingRoutes.firstOrNull()?.let { route ->
+                    routes.addPolyline(route.geometry).apply {
+                        setStrokeColor(0xFF0A6CCC.toInt())
+                        style = style.apply { strokeWidth = 5f }
+                    }
+                    routeActive = true
                 }
             }
-            overlays.add(MapEventsOverlay(receiver))
+
+            override fun onDrivingRoutesError(error: com.yandex.runtime.Error) {
+                Toast.makeText(context, "Не удалось построить маршрут", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    val locationOverlay = remember {
-        MyLocationNewOverlay(GpsMyLocationProvider(context), mapView)
+    fun buildRouteTo(destination: Point) {
+        val from = userLocationLayer.cameraPosition()?.target
+        if (from == null) {
+            Toast.makeText(
+                context,
+                "Местоположение не определено — включите геолокацию",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val requestPoints = listOf(
+            RequestPoint(from, RequestPointType.WAYPOINT, null, null, null),
+            RequestPoint(destination, RequestPointType.WAYPOINT, null, null, null)
+        )
+        drivingSession?.cancel()
+        drivingSession = drivingRouter.requestRoutes(
+            requestPoints, DrivingOptions(), VehicleOptions(), routeListener
+        )
     }
 
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
         if (result.values.any { it }) {
-            enableMyLocation(mapView, locationOverlay)
+            userLocationLayer.setVisible(true)
         }
     }
 
     val startVoiceAddress = rememberVoiceInput { spoken -> voiceAddress = spoken }
 
+    LaunchedEffect(Unit) {
+        map.addInputListener(inputListener)
+        val start = workPlaces.firstOrNull()
+            ?.let { Point(it.latitude, it.longitude) }
+            ?: Point(KhabarovskRegion.CENTER_LAT, KhabarovskRegion.CENTER_LON)
+        map.move(CameraPosition(start, 12f, 0f, 0f))
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                Lifecycle.Event.ON_START -> mapView.onStart()
+                Lifecycle.Event.ON_STOP -> mapView.onStop()
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.onDetach()
+            mapView.onStop()
         }
     }
 
@@ -134,55 +204,59 @@ fun MapScreen(
         AndroidView(
             factory = { mapView },
             modifier = Modifier.fillMaxSize(),
-            update = { map ->
-                map.overlays.removeAll { it is Marker }
+            update = {
+                placemarks.clear()
                 workPlaces.forEach { place ->
-                    val marker = Marker(map).apply {
-                        position = GeoPoint(place.latitude, place.longitude)
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        title = place.title
-                        snippet = place.description
-                        setOnMarkerClickListener { _, _ ->
-                            selectedPlace = place
-                            true
-                        }
+                    placemarks.addPlacemark().apply {
+                        geometry = Point(place.latitude, place.longitude)
+                        userData = place
+                        setIcon(pinIcon, IconStyle().apply { anchor = PointF(0.5f, 1.0f) })
+                        addTapListener(placemarkTapListener)
                     }
-                    map.overlays.add(marker)
                 }
-                map.invalidate()
             }
         )
 
-        Column(
-            modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
-        ) {
-            Text(
-                "Удержите палец на карте или нажмите «Адрес голосом»",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .background(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                        androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
-                    )
-                    .padding(8.dp)
-            )
-        }
+        Text(
+            "Удержите палец на карте или нажмите «Адрес голосом»",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp)
+                .background(
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                    RoundedCornerShape(8.dp)
+                )
+                .padding(8.dp)
+        )
 
         FloatingActionButton(
             onClick = {
-                val fine = ContextCompat.checkSelfPermission(
+                val granted = ContextCompat.checkSelfPermission(
                     context, Manifest.permission.ACCESS_FINE_LOCATION
                 ) == PackageManager.PERMISSION_GRANTED
-                if (fine) {
-                    enableMyLocation(mapView, locationOverlay)
-                } else {
+                if (!granted) {
                     locationPermission.launch(
                         arrayOf(
                             Manifest.permission.ACCESS_FINE_LOCATION,
                             Manifest.permission.ACCESS_COARSE_LOCATION
                         )
                     )
+                    return@FloatingActionButton
+                }
+                userLocationLayer.setVisible(true)
+                val position = userLocationLayer.cameraPosition()
+                if (position != null) {
+                    map.move(
+                        CameraPosition(position.target, 16f, 0f, 0f),
+                        Animation(Animation.Type.SMOOTH, 0.6f),
+                        null
+                    )
+                } else {
+                    Toast.makeText(
+                        context, "Определяю местоположение…", Toast.LENGTH_SHORT
+                    ).show()
                 }
             },
             modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
@@ -196,6 +270,19 @@ fun MapScreen(
             text = { Text("Адрес голосом") },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
         )
+
+        if (routeActive) {
+            ExtendedFloatingActionButton(
+                onClick = {
+                    drivingSession?.cancel()
+                    routes.clear()
+                    routeActive = false
+                },
+                icon = { Icon(Icons.Default.Close, contentDescription = null) },
+                text = { Text("Сбросить маршрут") },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp)
+            )
+        }
     }
 
     pendingPoint?.let { point ->
@@ -213,6 +300,10 @@ fun MapScreen(
         PlaceDetailsDialog(
             place = place,
             onDismiss = { selectedPlace = null },
+            onRoute = {
+                buildRouteTo(Point(place.latitude, place.longitude))
+                selectedPlace = null
+            },
             onDelete = {
                 onDelete(place)
                 selectedPlace = null
@@ -227,34 +318,32 @@ fun MapScreen(
             onConfirm = { place, reminder ->
                 onSave(place)
                 reminder?.let(onSaveReminder)
-                mapView.controller.animateTo(GeoPoint(place.latitude, place.longitude))
-                mapView.controller.setZoom(16.0)
+                map.move(
+                    CameraPosition(Point(place.latitude, place.longitude), 16f, 0f, 0f),
+                    Animation(Animation.Type.SMOOTH, 0.6f),
+                    null
+                )
                 voiceAddress = null
             }
         )
     }
 }
 
-private fun enableMyLocation(mapView: MapView, overlay: MyLocationNewOverlay) {
-    overlay.enableMyLocation()
-    if (!mapView.overlays.contains(overlay)) {
-        mapView.overlays.add(overlay)
-    }
-    overlay.runOnFirstFix {
-        val location = overlay.myLocation
-        if (location != null) {
-            mapView.post {
-                mapView.controller.animateTo(location)
-                mapView.controller.setZoom(15.0)
-            }
-        }
-    }
-    mapView.invalidate()
+/** Растеризует векторную метку в bitmap для иконки MapKit. */
+private fun pinImageProvider(context: Context): ImageProvider {
+    val drawable = ContextCompat.getDrawable(context, R.drawable.ic_map_pin)!!
+    val width = drawable.intrinsicWidth.coerceAtLeast(1)
+    val height = drawable.intrinsicHeight.coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, width, height)
+    drawable.draw(canvas)
+    return ImageProvider.fromBitmap(bitmap)
 }
 
 @Composable
 private fun AddPlaceDialog(
-    point: GeoPoint,
+    point: Point,
     onDismiss: () -> Unit,
     onSave: (WorkPlace) -> Unit
 ) {
@@ -430,6 +519,7 @@ private fun VoiceAddressDialog(
 private fun PlaceDetailsDialog(
     place: WorkPlace,
     onDismiss: () -> Unit,
+    onRoute: () -> Unit,
     onDelete: () -> Unit
 ) {
     AlertDialog(
@@ -448,6 +538,13 @@ private fun PlaceDetailsDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                OutlinedButton(
+                    onClick = onRoute,
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                ) {
+                    Icon(Icons.Default.Navigation, contentDescription = null)
+                    Text("  Маршрут сюда")
+                }
             }
         },
         confirmButton = {

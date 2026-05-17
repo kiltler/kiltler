@@ -3,14 +3,14 @@ package com.kiltler.assistant
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import org.osmdroid.config.Configuration
+import com.yandex.mapkit.MapKitFactory
 
 class AssistantApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        configureOsmdroid()
+        MapKitFactory.setApiKey(MAPKIT_API_KEY)
     }
 
     private fun createNotificationChannel() {
@@ -26,17 +26,8 @@ class AssistantApp : Application() {
         manager.createNotificationChannel(channel)
     }
 
-    private fun configureOsmdroid() {
-        val prefs = getSharedPreferences("osmdroid", MODE_PRIVATE)
-        Configuration.getInstance().apply {
-            load(this@AssistantApp, prefs)
-            userAgentValue = packageName
-            osmdroidBasePath = cacheDir
-            osmdroidTileCache = cacheDir.resolve("osm_tiles")
-        }
-    }
-
     companion object {
         const val CHANNEL_REMINDERS = "reminders"
+        private const val MAPKIT_API_KEY = "9ea78a5d-ed0b-4575-8256-4095f5c8243f"
     }
 }
