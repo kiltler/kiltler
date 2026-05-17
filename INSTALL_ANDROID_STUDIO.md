@@ -12,7 +12,7 @@
 | Android Studio | **Ladybug (2024.2.1)** или новее |
 | JDK | **17** (входит в Android Studio) |
 | Android Gradle Plugin | 8.7.3 |
-| Gradle | 8.9 (скачается автоматически через wrapper) |
+| Gradle | 8.11.1 (скачается автоматически через wrapper) |
 | Kotlin | 2.0.21 |
 | Android SDK | API 35 (compileSdk / targetSdk), minSdk — API 26 (Android 8.0) |
 
@@ -127,3 +127,4 @@ app/src/main/java/com/kiltler/assistant/
 | Устройство не видно | Проверьте отладку по USB; выполните `adb devices` |
 | Карта пустая | Проверьте интернет и выданное разрешение на геолокацию |
 | Долгая первая сборка | Это нормально — далее сборки кэшируются |
+| `Project Migration Error` / `Unknown command-line option '--jvm-vendor'` | Необязательная миграция Android Studio. Нажмите **OK** и выполните обычный Gradle Sync — на сборку не влияет |
