@@ -186,6 +186,9 @@ fun MapScreen(
     }
 
     DisposableEffect(lifecycleOwner) {
+        // Экран открывается, когда жизненный цикл уже в STARTED, поэтому
+        // запускаем карту сразу — иначе MapKit не начнёт отрисовку.
+        mapView.onStart()
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> mapView.onStart()
