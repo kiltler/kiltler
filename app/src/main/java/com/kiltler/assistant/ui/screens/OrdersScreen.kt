@@ -1,5 +1,9 @@
 package com.kiltler.assistant.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +24,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -112,6 +117,7 @@ fun OrdersScreen(
 @Composable
 private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
     val status = OrderStatus.from(order.status)
+    val context = LocalContext.current
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -152,7 +158,27 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
+            if (order.phone.isNotBlank()) {
+                FilledTonalButton(
+                    onClick = { dialPhone(context, order.phone) },
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Icon(Icons.Default.Call, contentDescription = null)
+                    Text("  Позвонить")
+                }
+            }
         }
+    }
+}
+
+/** Открывает номеронабиратель с заранее введённым номером заказа. */
+private fun dialPhone(context: Context, phone: String) {
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_DIAL, Uri.parse("tel:${phone.trim()}"))
+        )
+    } catch (e: Exception) {
+        Toast.makeText(context, "Не удалось открыть набор номера", Toast.LENGTH_SHORT).show()
     }
 }
 
