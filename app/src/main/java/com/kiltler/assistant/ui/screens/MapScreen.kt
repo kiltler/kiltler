@@ -89,7 +89,9 @@ fun MapScreen(
     workPlaces: List<WorkPlace>,
     onSave: (WorkPlace) -> Unit,
     onSaveReminder: (Reminder) -> Unit,
-    onDelete: (WorkPlace) -> Unit
+    onDelete: (WorkPlace) -> Unit,
+    routeRequest: String?,
+    onRouteConsumed: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -132,13 +134,18 @@ fun MapScreen(
         object : DrivingSession.DrivingRouteListener {
             override fun onDrivingRoutes(drivingRoutes: MutableList<DrivingRoute>) {
                 routes.clear()
-                drivingRoutes.firstOrNull()?.let { route ->
-                    routes.addPolyline(route.geometry).apply {
-                        setStrokeColor(0xFF0A6CCC.toInt())
-                        style = style.apply { strokeWidth = 5f }
-                    }
-                    routeActive = true
+                val route = drivingRoutes.firstOrNull() ?: return
+                routes.addPolyline(route.geometry).apply {
+                    setStrokeColor(0xFF0A6CCC.toInt())
+                    style = style.apply { strokeWidth = 5f }
                 }
+                route.geometry.points.lastOrNull()?.let { end ->
+                    routes.addPlacemark().apply {
+                        geometry = end
+                        setIcon(pinIcon, IconStyle().apply { anchor = PointF(0.5f, 1.0f) })
+                    }
+                }
+                routeActive = true
             }
 
             override fun onDrivingRoutesError(error: com.yandex.runtime.Error) {
@@ -148,15 +155,15 @@ fun MapScreen(
     }
 
     fun buildRouteTo(destination: Point) {
-        val from = userLocationLayer.cameraPosition()?.target
-        if (from == null) {
+        val userPoint = userLocationLayer.cameraPosition()?.target
+        if (userPoint == null) {
             Toast.makeText(
                 context,
-                "Местоположение не определено — включите геолокацию",
+                "Геолокация не определена — маршрут от центра карты",
                 Toast.LENGTH_SHORT
             ).show()
-            return
         }
+        val from = userPoint ?: map.cameraPosition.target
         val requestPoints = listOf(
             RequestPoint(from, RequestPointType.WAYPOINT, null, null, null),
             RequestPoint(destination, RequestPointType.WAYPOINT, null, null, null)
@@ -183,6 +190,24 @@ fun MapScreen(
             ?.let { Point(it.latitude, it.longitude) }
             ?: Point(KhabarovskRegion.CENTER_LAT, KhabarovskRegion.CENTER_LON)
         map.move(CameraPosition(start, 12f, 0f, 0f))
+    }
+
+    // Маршрут по адресу заказа: геокодируем и строим прямо на встроенной карте.
+    LaunchedEffect(routeRequest) {
+        val address = routeRequest ?: return@LaunchedEffect
+        val result = geocodeAddress(context, address)
+        if (result != null) {
+            val destination = Point(result.latitude, result.longitude)
+            buildRouteTo(destination)
+            map.move(
+                CameraPosition(destination, 14f, 0f, 0f),
+                Animation(Animation.Type.SMOOTH, 0.6f),
+                null
+            )
+        } else {
+            Toast.makeText(context, "Адрес заказа не найден на карте", Toast.LENGTH_LONG).show()
+        }
+        onRouteConsumed()
     }
 
     DisposableEffect(lifecycleOwner) {

@@ -72,6 +72,8 @@ fun AppScaffold() {
     var showMaterialDialog by remember { mutableStateOf(false) }
     var editingMaterial by remember { mutableStateOf<Material?>(null) }
 
+    var routeRequest by remember { mutableStateOf<String?>(null) }
+
     val reminders by vm.reminders.collectAsStateWithLifecycle()
     val orders by vm.orders.collectAsStateWithLifecycle()
     val materials by vm.materials.collectAsStateWithLifecycle()
@@ -204,7 +206,13 @@ fun AppScaffold() {
                         onDismissDialog = { showOrderDialog = false },
                         onSave = vm::saveOrder,
                         onDelete = vm::deleteOrder,
-                        onEdit = { editingOrder = it; showOrderDialog = true }
+                        onEdit = { editingOrder = it; showOrderDialog = true },
+                        onRoute = { order ->
+                            if (order.address.isNotBlank()) {
+                                routeRequest = order.address
+                                tab = Tab.MAP
+                            }
+                        }
                     )
                     Tab.MATERIALS -> MaterialsScreen(
                         materials = materials,
@@ -220,7 +228,9 @@ fun AppScaffold() {
                         workPlaces = workPlaces,
                         onSave = vm::saveWorkPlace,
                         onSaveReminder = vm::saveReminder,
-                        onDelete = vm::deleteWorkPlace
+                        onDelete = vm::deleteWorkPlace,
+                        routeRequest = routeRequest,
+                        onRouteConsumed = { routeRequest = null }
                     )
                 }
             }

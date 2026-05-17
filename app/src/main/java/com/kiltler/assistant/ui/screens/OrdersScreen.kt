@@ -65,7 +65,6 @@ import com.kiltler.assistant.ui.StatusBadge
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDateTime
 import com.kiltler.assistant.ui.pickDateTime
-import com.kiltler.assistant.ui.qualifyAddress
 
 /** Виды работ по заказу — можно выбрать несколько одновременно. */
 enum class WorkType(val label: String, val icon: ImageVector) {
@@ -96,7 +95,8 @@ fun OrdersScreen(
     onDismissDialog: () -> Unit,
     onSave: (Order) -> Unit,
     onDelete: (Order) -> Unit,
-    onEdit: (Order) -> Unit
+    onEdit: (Order) -> Unit,
+    onRoute: (Order) -> Unit
 ) {
     var filter by remember { mutableStateOf<OrderStatus?>(null) }
     val visible = orders.filter { filter == null || it.status == filter!!.name }
@@ -132,7 +132,12 @@ fun OrdersScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(visible, key = { it.id }) { order ->
-                    OrderCard(order, onClick = { onEdit(order) }, onDelete = { onDelete(order) })
+                    OrderCard(
+                        order,
+                        onClick = { onEdit(order) },
+                        onDelete = { onDelete(order) },
+                        onRoute = { onRoute(order) }
+                    )
                 }
             }
         }
@@ -148,7 +153,12 @@ fun OrdersScreen(
 }
 
 @Composable
-private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun OrderCard(
+    order: Order,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    onRoute: () -> Unit
+) {
     val status = OrderStatus.from(order.status)
     val context = LocalContext.current
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
@@ -208,11 +218,11 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
             }
             if (order.address.isNotBlank()) {
                 FilledTonalButton(
-                    onClick = { routeToAddress(context, order.address) },
+                    onClick = onRoute,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
                     Icon(Icons.Default.Navigation, contentDescription = null)
-                    Text("  Маршрут")
+                    Text("  Маршрут на карте")
                 }
             }
         }
@@ -254,31 +264,6 @@ private fun dialPhone(context: Context, phone: String) {
     } catch (e: Exception) {
         Toast.makeText(context, "Не удалось открыть набор номера", Toast.LENGTH_SHORT).show()
     }
-}
-
-/**
- * Строит маршрут до адреса заказа в Яндекс Картах. Адрес передаётся
- * текстом (с уточнением города) — Яндекс сам определяет координаты,
- * это точнее системного геокодера. Навигатор намеренно не вызывается.
- */
-private fun routeToAddress(context: Context, address: String) {
-    val encoded = Uri.encode(qualifyAddress(address))
-    val targets = listOf(
-        "yandexmaps://maps.yandex.ru/?rtext=~$encoded&rtt=auto",
-        "https://yandex.ru/maps/?rtext=~$encoded&rtt=auto"
-    )
-    for (uri in targets) {
-        try {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(uri))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-            return
-        } catch (e: Exception) {
-            // приложение не найдено — пробуем следующий вариант
-        }
-    }
-    Toast.makeText(context, "Не удалось открыть Яндекс Карты", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
