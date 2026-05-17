@@ -43,8 +43,8 @@ suspend fun geocodeAddress(context: Context, query: String): GeocodeResult? =
         if (trimmed.isBlank() || !Geocoder.isPresent()) return@withContext null
         val geocoder = Geocoder(context, Locale("ru"))
 
-        // Запросы по убыванию приоритета: вариант с привязкой к краю — первым.
-        val queries = listOf(withRegionSuffix(trimmed), trimmed).distinct()
+        // Запросы по убыванию приоритета: вариант с уточнением города — первым.
+        val queries = listOf(qualifyAddress(trimmed), trimmed).distinct()
 
         // 1. Совпадение строго в границах Хабаровского края.
         for (q in queries) {
@@ -57,11 +57,17 @@ suspend fun geocodeAddress(context: Context, query: String): GeocodeResult? =
         null
     }
 
-/** Добавляет «, Хабаровский край», если регион ещё не упомянут в запросе. */
-private fun withRegionSuffix(query: String): String {
-    val lower = query.lowercase()
-    return if (lower.contains("хабаров") || lower.contains("край")) query
-    else "$query, Хабаровский край"
+private val KNOWN_CITIES = listOf("хабаровск", "комсомольск", "амурск")
+
+/**
+ * Дополняет адрес городом Хабаровск, если город не указан явно.
+ * Резко повышает точность для коротких адресов вида «Ворошилова 4».
+ */
+fun qualifyAddress(query: String): String {
+    val trimmed = query.trim()
+    val lower = trimmed.lowercase()
+    return if (KNOWN_CITIES.any { it in lower }) trimmed
+    else "Хабаровск, $trimmed"
 }
 
 /** Ищет адрес с привязкой к краю и оставляет только попавшие в его границы. */

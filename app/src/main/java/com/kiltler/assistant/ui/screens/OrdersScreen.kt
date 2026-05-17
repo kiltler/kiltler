@@ -48,7 +48,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,9 +64,8 @@ import com.kiltler.assistant.ui.SectionHeader
 import com.kiltler.assistant.ui.StatusBadge
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDateTime
-import com.kiltler.assistant.ui.geocodeAddress
 import com.kiltler.assistant.ui.pickDateTime
-import kotlinx.coroutines.launch
+import com.kiltler.assistant.ui.qualifyAddress
 
 /** Виды работ по заказу — можно выбрать несколько одновременно. */
 enum class WorkType(val label: String, val icon: ImageVector) {
@@ -153,7 +151,6 @@ fun OrdersScreen(
 private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
     val status = OrderStatus.from(order.status)
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -211,7 +208,7 @@ private fun OrderCard(order: Order, onClick: () -> Unit, onDelete: () -> Unit) {
             }
             if (order.address.isNotBlank()) {
                 FilledTonalButton(
-                    onClick = { scope.launch { routeToAddress(context, order.address) } },
+                    onClick = { routeToAddress(context, order.address) },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
                     Icon(Icons.Default.Navigation, contentDescription = null)
@@ -260,24 +257,16 @@ private fun dialPhone(context: Context, phone: String) {
 }
 
 /**
- * Геокодирует адрес заказа в координаты и строит маршрут:
- * Яндекс Навигатор → Яндекс Карты → браузер.
+ * Строит маршрут до адреса заказа в Яндекс Картах. Адрес передаётся
+ * текстом (с уточнением города) — Яндекс сам определяет координаты,
+ * это точнее системного геокодера. Навигатор намеренно не вызывается.
  */
-private suspend fun routeToAddress(context: Context, address: String) {
-    val geo = geocodeAddress(context, address)
-    val targets = if (geo != null) {
-        listOf(
-            "yandexnavi://build_route_on_map?lat_to=${geo.latitude}&lon_to=${geo.longitude}",
-            "yandexmaps://maps.yandex.ru/?rtext=~${geo.latitude},${geo.longitude}&rtt=auto",
-            "https://yandex.ru/maps/?rtext=~${geo.latitude},${geo.longitude}&rtt=auto"
-        )
-    } else {
-        val encoded = Uri.encode(address.trim())
-        listOf(
-            "yandexmaps://maps.yandex.ru/?rtext=~$encoded&rtt=auto",
-            "https://yandex.ru/maps/?text=$encoded"
-        )
-    }
+private fun routeToAddress(context: Context, address: String) {
+    val encoded = Uri.encode(qualifyAddress(address))
+    val targets = listOf(
+        "yandexmaps://maps.yandex.ru/?rtext=~$encoded&rtt=auto",
+        "https://yandex.ru/maps/?rtext=~$encoded&rtt=auto"
+    )
     for (uri in targets) {
         try {
             context.startActivity(
@@ -289,7 +278,7 @@ private suspend fun routeToAddress(context: Context, address: String) {
             // приложение не найдено — пробуем следующий вариант
         }
     }
-    Toast.makeText(context, "Не удалось построить маршрут", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, "Не удалось открыть Яндекс Карты", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
