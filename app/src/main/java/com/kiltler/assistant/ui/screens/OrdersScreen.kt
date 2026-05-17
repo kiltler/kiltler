@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,7 +65,10 @@ import com.kiltler.assistant.ui.SectionHeader
 import com.kiltler.assistant.ui.StatusBadge
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDateTime
+import com.kiltler.assistant.ui.geocodeAddress
+import com.kiltler.assistant.ui.openYandexDrivingRoute
 import com.kiltler.assistant.ui.pickDateTime
+import kotlinx.coroutines.launch
 
 /** Виды работ по заказу — можно выбрать несколько одновременно. */
 enum class WorkType(val label: String, val icon: ImageVector) {
@@ -95,8 +99,7 @@ fun OrdersScreen(
     onDismissDialog: () -> Unit,
     onSave: (Order) -> Unit,
     onDelete: (Order) -> Unit,
-    onEdit: (Order) -> Unit,
-    onRoute: (Order) -> Unit
+    onEdit: (Order) -> Unit
 ) {
     var filter by remember { mutableStateOf<OrderStatus?>(null) }
     val visible = orders.filter { filter == null || it.status == filter!!.name }
@@ -135,8 +138,7 @@ fun OrdersScreen(
                     OrderCard(
                         order,
                         onClick = { onEdit(order) },
-                        onDelete = { onDelete(order) },
-                        onRoute = { onRoute(order) }
+                        onDelete = { onDelete(order) }
                     )
                 }
             }
@@ -156,11 +158,11 @@ fun OrdersScreen(
 private fun OrderCard(
     order: Order,
     onClick: () -> Unit,
-    onDelete: () -> Unit,
-    onRoute: () -> Unit
+    onDelete: () -> Unit
 ) {
     val status = OrderStatus.from(order.status)
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -178,7 +180,9 @@ private fun OrderCard(
                 }
             }
             if (order.phone.isNotBlank()) InfoLine(Icons.Default.Call, order.phone)
-            if (order.address.isNotBlank()) InfoLine(Icons.Default.Place, order.address)
+            if (order.address.isNotBlank()) {
+                InfoLine(Icons.Default.Place, fullAddress(order))
+            }
             if (order.scheduledMillis != null) {
                 InfoLine(Icons.Default.Schedule, formatDateTime(order.scheduledMillis))
             }
@@ -218,7 +222,22 @@ private fun OrderCard(
             }
             if (order.address.isNotBlank()) {
                 FilledTonalButton(
-                    onClick = onRoute,
+                    onClick = {
+                        scope.launch {
+                            val result = geocodeAddress(context, order.address)
+                            if (result != null) {
+                                openYandexDrivingRoute(
+                                    context, result.latitude, result.longitude
+                                )
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Адрес не найден — уточните адрес заказа",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
                     Icon(Icons.Default.Navigation, contentDescription = null)
@@ -297,6 +316,8 @@ private fun OrderDialog(
     var client by remember { mutableStateOf(initial?.clientName ?: "") }
     var phone by remember { mutableStateOf((initial?.phone ?: "").ifBlank { PHONE_PREFIX }) }
     var address by remember { mutableStateOf(initial?.address ?: "") }
+    var apartment by remember { mutableStateOf(initial?.apartment ?: "") }
+    var entrance by remember { mutableStateOf(initial?.entrance ?: "") }
     var workTypes by remember {
         mutableStateOf(WorkType.parse(initial?.description ?: "").toSet())
     }
@@ -325,6 +346,22 @@ private fun OrderDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 VoiceTextField(address, { address = it }, "Адрес", Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = apartment,
+                        onValueChange = { apartment = it },
+                        label = { Text("Квартира") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = entrance,
+                        onValueChange = { entrance = it },
+                        label = { Text("Подъезд") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
                 SectionHeader("Виды работ")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -399,6 +436,8 @@ private fun OrderDialog(
                                 clientName = client.trim(),
                                 phone = phoneClean,
                                 address = address.trim(),
+                                apartment = apartment.trim(),
+                                entrance = entrance.trim(),
                                 description = WorkType.join(workTypes),
                                 price = price,
                                 status = status.name,
@@ -430,3 +469,10 @@ private fun formatPhone(input: String): String {
 
 private fun formatMoney(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+
+/** Полный адрес заказа: улица плюс квартира и подъезд, если заданы. */
+private fun fullAddress(order: Order): String = buildString {
+    append(order.address)
+    if (order.apartment.isNotBlank()) append(", кв. ${order.apartment}")
+    if (order.entrance.isNotBlank()) append(", подъезд ${order.entrance}")
+}

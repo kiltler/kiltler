@@ -22,6 +22,8 @@ data class Order(
     val clientName: String,
     val phone: String = "",
     val address: String = "",
+    val apartment: String = "",
+    val entrance: String = "",
     val description: String = "",
     val price: Double = 0.0,
     val status: String = OrderStatus.NEW.name,

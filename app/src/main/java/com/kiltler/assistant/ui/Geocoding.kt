@@ -1,11 +1,33 @@
 package com.kiltler.assistant.ui
 
 import android.content.Context
+import android.content.Intent
 import android.location.Address
 import android.location.Geocoder
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
+
+/** Открывает Яндекс Карты с автомобильным маршрутом до координат. */
+fun openYandexDrivingRoute(context: Context, latitude: Double, longitude: Double) {
+    val point = "$latitude,$longitude"
+    val targets = listOf(
+        "yandexmaps://maps.yandex.ru/?rtext=~$point&rtt=auto",
+        "https://yandex.ru/maps/?rtext=~$point&rtt=auto"
+    )
+    for (uri in targets) {
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(uri))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            return
+        } catch (e: Exception) {
+            // приложение не найдено — пробуем следующий вариант
+        }
+    }
+}
 
 /** Результат геокодирования адреса в координаты. */
 data class GeocodeResult(

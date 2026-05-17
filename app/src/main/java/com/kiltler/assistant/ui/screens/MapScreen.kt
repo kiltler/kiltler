@@ -54,6 +54,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kiltler.assistant.R
+import com.kiltler.assistant.data.Order
+import com.kiltler.assistant.data.OrderStatus
 import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.data.WorkPlace
 import com.kiltler.assistant.ui.GeocodeResult
@@ -62,6 +64,7 @@ import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDate
 import com.kiltler.assistant.ui.formatDateTime
 import com.kiltler.assistant.ui.geocodeAddress
+import com.kiltler.assistant.ui.openYandexDrivingRoute
 import com.kiltler.assistant.ui.pickDateTime
 import com.kiltler.assistant.ui.rememberVoiceInput
 import com.yandex.mapkit.Animation
@@ -84,22 +87,26 @@ import com.yandex.mapkit.mapview.MapView
 import com.yandex.runtime.image.ImageProvider
 import kotlinx.coroutines.launch
 
+private const val HOUR_MS = 3_600_000L
+
 @Composable
 fun MapScreen(
     workPlaces: List<WorkPlace>,
+    orders: List<Order>,
     onSave: (WorkPlace) -> Unit,
     onSaveReminder: (Reminder) -> Unit,
-    onDelete: (WorkPlace) -> Unit,
-    routeRequest: String?,
-    onRouteConsumed: () -> Unit
+    onDelete: (WorkPlace) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var pendingPoint by remember { mutableStateOf<Point?>(null) }
     var selectedPlace by remember { mutableStateOf<WorkPlace?>(null) }
+    var selectedOrder by remember { mutableStateOf<Order?>(null) }
     var voiceAddress by remember { mutableStateOf<String?>(null) }
     var routeActive by remember { mutableStateOf(false) }
+    var orderPoints by remember { mutableStateOf<List<Pair<Order, Point>>>(emptyList()) }
+    val geocodeCache = remember { mutableMapOf<String, Point>() }
 
     val mapView = remember { MapView(context) }
     val map = remember { mapView.mapWindow.map }
@@ -113,12 +120,27 @@ fun MapScreen(
     val drivingRouter = remember {
         DirectionsFactory.getInstance().createDrivingRouter(DrivingRouterType.COMBINED)
     }
-    val pinIcon = remember { pinImageProvider(context) }
+    val pinBlue = remember { pinImageProvider(context, R.drawable.ic_map_pin) }
+    val pinAmber = remember { pinImageProvider(context, R.drawable.ic_map_pin_amber) }
+    val pinRed = remember { pinImageProvider(context, R.drawable.ic_map_pin_red) }
     var drivingSession by remember { mutableStateOf<DrivingSession?>(null) }
+
+    fun pinForOrder(scheduledMillis: Long?): ImageProvider {
+        if (scheduledMillis == null) return pinBlue
+        val left = scheduledMillis - System.currentTimeMillis()
+        return when {
+            left <= HOUR_MS -> pinRed
+            left <= 3 * HOUR_MS -> pinAmber
+            else -> pinBlue
+        }
+    }
 
     val placemarkTapListener = remember {
         MapObjectTapListener { mapObject, _ ->
-            (mapObject.userData as? WorkPlace)?.let { selectedPlace = it }
+            when (val data = mapObject.userData) {
+                is WorkPlace -> selectedPlace = data
+                is Order -> selectedOrder = data
+            }
             true
         }
     }
@@ -142,7 +164,7 @@ fun MapScreen(
                 route.geometry.points.lastOrNull()?.let { end ->
                     routes.addPlacemark().apply {
                         geometry = end
-                        setIcon(pinIcon, IconStyle().apply { anchor = PointF(0.5f, 1.0f) })
+                        setIcon(pinBlue, IconStyle().apply { anchor = PointF(0.5f, 1.0f) })
                     }
                 }
                 routeActive = true
@@ -192,22 +214,26 @@ fun MapScreen(
         map.move(CameraPosition(start, 12f, 0f, 0f))
     }
 
-    // Маршрут по адресу заказа: геокодируем и строим прямо на встроенной карте.
-    LaunchedEffect(routeRequest) {
-        val address = routeRequest ?: return@LaunchedEffect
-        val result = geocodeAddress(context, address)
-        if (result != null) {
-            val destination = Point(result.latitude, result.longitude)
-            buildRouteTo(destination)
-            map.move(
-                CameraPosition(destination, 14f, 0f, 0f),
-                Animation(Animation.Type.SMOOTH, 0.6f),
-                null
-            )
-        } else {
-            Toast.makeText(context, "Адрес заказа не найден на карте", Toast.LENGTH_LONG).show()
-        }
-        onRouteConsumed()
+    // Заказы с адресом дублируются на карте отдельными метками.
+    LaunchedEffect(orders) {
+        val collected = mutableListOf<Pair<Order, Point>>()
+        orders
+            .filter { order ->
+                order.address.isNotBlank() &&
+                    OrderStatus.from(order.status).let {
+                        it != OrderStatus.DONE && it != OrderStatus.CANCELLED
+                    }
+            }
+            .forEach { order ->
+                val point = geocodeCache[order.address]
+                    ?: geocodeAddress(context, order.address)?.let { Point(it.latitude, it.longitude) }
+                if (point != null) {
+                    geocodeCache[order.address] = point
+                    collected.add(order to point)
+                    orderPoints = collected.toList()
+                }
+            }
+        orderPoints = collected.toList()
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -238,7 +264,18 @@ fun MapScreen(
                     placemarks.addPlacemark().apply {
                         geometry = Point(place.latitude, place.longitude)
                         userData = place
-                        setIcon(pinIcon, IconStyle().apply { anchor = PointF(0.5f, 1.0f) })
+                        setIcon(pinBlue, IconStyle().apply { anchor = PointF(0.5f, 1.0f) })
+                        addTapListener(placemarkTapListener)
+                    }
+                }
+                orderPoints.forEach { (order, point) ->
+                    placemarks.addPlacemark().apply {
+                        geometry = point
+                        userData = order
+                        setIcon(
+                            pinForOrder(order.scheduledMillis),
+                            IconStyle().apply { anchor = PointF(0.5f, 1.0f) }
+                        )
                         addTapListener(placemarkTapListener)
                     }
                 }
@@ -339,6 +376,20 @@ fun MapScreen(
         )
     }
 
+    selectedOrder?.let { order ->
+        val point = orderPoints.firstOrNull { it.first.id == order.id }?.second
+        OrderMarkerDialog(
+            order = order,
+            onDismiss = { selectedOrder = null },
+            onRoute = {
+                if (point != null) {
+                    openYandexDrivingRoute(context, point.latitude, point.longitude)
+                }
+                selectedOrder = null
+            }
+        )
+    }
+
     voiceAddress?.let { text ->
         VoiceAddressDialog(
             initialText = text,
@@ -358,8 +409,8 @@ fun MapScreen(
 }
 
 /** Растеризует векторную метку в bitmap для иконки MapKit. */
-private fun pinImageProvider(context: Context): ImageProvider {
-    val drawable = ContextCompat.getDrawable(context, R.drawable.ic_map_pin)!!
+private fun pinImageProvider(context: Context, resId: Int): ImageProvider {
+    val drawable = ContextCompat.getDrawable(context, resId)!!
     val width = drawable.intrinsicWidth.coerceAtLeast(1)
     val height = drawable.intrinsicHeight.coerceAtLeast(1)
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -435,7 +486,7 @@ private fun VoiceAddressDialog(
     var status by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var withReminder by remember { mutableStateOf(true) }
-    var reminderTime by remember { mutableStateOf(System.currentTimeMillis() + 3_600_000L) }
+    var reminderTime by remember { mutableStateOf(System.currentTimeMillis() + HOUR_MS) }
 
     fun runSearch() {
         if (address.isBlank()) {
@@ -581,5 +632,37 @@ private fun PlaceDetailsDialog(
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } }
+    )
+}
+
+@Composable
+private fun OrderMarkerDialog(
+    order: Order,
+    onDismiss: () -> Unit,
+    onRoute: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(order.clientName) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (order.address.isNotBlank()) Text(order.address)
+                order.scheduledMillis?.let {
+                    Text(
+                        "Выезд: ${formatDateTime(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                OutlinedButton(
+                    onClick = onRoute,
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                ) {
+                    Icon(Icons.Default.Navigation, contentDescription = null)
+                    Text("  Маршрут (Яндекс Карты)")
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } }
     )
 }
