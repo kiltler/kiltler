@@ -1,5 +1,6 @@
 package com.kiltler.assistant.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.ui.SectionHeader
+import com.kiltler.assistant.data.Order
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDateTime
 import com.kiltler.assistant.ui.pickDateTime
@@ -48,6 +50,7 @@ import com.kiltler.assistant.ui.pickDateTime
 @Composable
 fun ScheduleScreen(
     reminders: List<Reminder>,
+    orders: List<Order>,
     editing: Reminder?,
     showDialog: Boolean,
     onDismissDialog: () -> Unit,
@@ -55,6 +58,12 @@ fun ScheduleScreen(
     onToggleDone: (Reminder) -> Unit,
     onDelete: (Reminder) -> Unit
 ) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("finance", Context.MODE_PRIVATE) }
+    var matPct by remember { mutableStateOf(prefs.getInt("mat", 30)) }
+    var adsPct by remember { mutableStateOf(prefs.getInt("ads", 10)) }
+    var showFinance by remember { mutableStateOf(false) }
+
     val now = System.currentTimeMillis()
     val active = reminders.filter { !it.isDone }
     val overdue = active.filter { it.timeMillis < now }
@@ -62,18 +71,33 @@ fun ScheduleScreen(
     val upcoming = active.filter { it.timeMillis >= now && !isToday(it.timeMillis) }
     val done = reminders.filter { it.isDone }
 
-    if (reminders.isEmpty()) {
-        EmptyState(Icons.Default.Schedule, "Пока нет напоминаний", "Нажмите +, чтобы добавить первое")
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            section("Просрочено", overdue, onToggleDone, onDelete, accent = true)
-            section("Сегодня", today, onToggleDone, onDelete)
-            section("Предстоящие", upcoming, onToggleDone, onDelete)
-            section("Выполнено", done, onToggleDone, onDelete)
+    Column(modifier = Modifier.fillMaxSize()) {
+        FinanceCard(
+            orders = orders,
+            matPct = matPct,
+            adsPct = adsPct,
+            onClick = { showFinance = true },
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+        )
+        if (reminders.isEmpty()) {
+            Box(modifier = Modifier.weight(1f)) {
+                EmptyState(
+                    Icons.Default.Schedule,
+                    "Пока нет напоминаний",
+                    "Нажмите +, чтобы добавить первое"
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                section("Просрочено", overdue, onToggleDone, onDelete, accent = true)
+                section("Сегодня", today, onToggleDone, onDelete)
+                section("Предстоящие", upcoming, onToggleDone, onDelete)
+                section("Выполнено", done, onToggleDone, onDelete)
+            }
         }
     }
 
@@ -82,6 +106,21 @@ fun ScheduleScreen(
             initial = editing,
             onDismiss = onDismissDialog,
             onSave = { onSave(it); onDismissDialog() }
+        )
+    }
+
+    if (showFinance) {
+        FinanceDialog(
+            orders = orders,
+            matPct = matPct,
+            adsPct = adsPct,
+            onDismiss = { showFinance = false },
+            onSave = { m, a ->
+                matPct = m
+                adsPct = a
+                prefs.edit().putInt("mat", m).putInt("ads", a).apply()
+                showFinance = false
+            }
         )
     }
 }

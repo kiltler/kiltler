@@ -198,6 +198,7 @@ fun AppScaffold() {
             when (tab) {
                     Tab.SCHEDULE -> ScheduleScreen(
                         reminders = reminders,
+                        orders = orders,
                         editing = editingReminder,
                         showDialog = showReminderDialog,
                         onDismissDialog = { showReminderDialog = false },
