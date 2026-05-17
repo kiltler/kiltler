@@ -136,6 +136,18 @@ fun AppScaffold() {
                                 importLauncher.launch(arrayOf("application/json", "*/*"))
                             }
                         )
+                        DropdownMenuItem(
+                            text = { Text("Расходники: сплит-система") },
+                            onClick = {
+                                menuOpen = false
+                                vm.addSplitSystemMaterials()
+                                Toast.makeText(
+                                    context,
+                                    "Расходники добавлены в «Материалы»",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        )
                     }
                 }
             )

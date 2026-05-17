@@ -18,6 +18,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/** Типовой набор расходников для монтажа сплит-системы: пара «название — единица». */
+private val SPLIT_SYSTEM_KIT = listOf(
+    "Медная труба" to "пог. метр",
+    "Теплоизоляция" to "пог. метр",
+    "Кабель" to "пог. метр",
+    "Дренаж жидкий" to "пог. метр",
+    "Метапол" to "пог. метр",
+    "Кронштейны" to "комплект (пара)"
+)
+
 class AssistantViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = Repository(AppDatabase.get(app))
@@ -92,6 +102,14 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
     fun adjustMaterial(material: Material, delta: Double) = viewModelScope.launch {
         val updated = material.copy(quantity = (material.quantity + delta).coerceAtLeast(0.0))
         repo.upsertMaterial(updated)
+    }
+
+    /** Добавляет расходники для сплит-системы, пропуская уже существующие по названию. */
+    fun addSplitSystemMaterials() = viewModelScope.launch {
+        val existing = repo.allMaterials().mapTo(HashSet()) { it.name.trim().lowercase() }
+        SPLIT_SYSTEM_KIT
+            .filter { it.first.lowercase() !in existing }
+            .forEach { (name, unit) -> repo.upsertMaterial(Material(name = name, unit = unit)) }
     }
 
     // --- Места работы ---
