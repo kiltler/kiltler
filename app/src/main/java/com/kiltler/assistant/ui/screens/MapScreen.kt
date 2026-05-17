@@ -63,7 +63,9 @@ import com.kiltler.assistant.ui.KhabarovskRegion
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDate
 import com.kiltler.assistant.ui.formatDateTime
+import com.kiltler.assistant.ui.formatTime
 import com.kiltler.assistant.ui.geocodeAddress
+import com.kiltler.assistant.ui.isToday
 import com.kiltler.assistant.ui.openYandexDrivingRoute
 import com.kiltler.assistant.ui.pickDateTime
 import com.kiltler.assistant.ui.rememberVoiceInput
@@ -83,6 +85,7 @@ import com.yandex.mapkit.map.IconStyle
 import com.yandex.mapkit.map.InputListener
 import com.yandex.mapkit.map.Map
 import com.yandex.mapkit.map.MapObjectTapListener
+import com.yandex.mapkit.map.TextStyle
 import com.yandex.mapkit.mapview.MapView
 import com.yandex.runtime.image.ImageProvider
 import kotlinx.coroutines.launch
@@ -276,6 +279,17 @@ fun MapScreen(
                             pinForOrder(order.scheduledMillis),
                             IconStyle().apply { anchor = PointF(0.5f, 1.0f) }
                         )
+                        val scheduled = order.scheduledMillis
+                        if (scheduled != null && isToday(scheduled)) {
+                            setText(
+                                "(${formatTime(scheduled)})",
+                                TextStyle().apply {
+                                    size = 11f
+                                    placement = TextStyle.Placement.TOP
+                                    offset = 4f
+                                }
+                            )
+                        }
                         addTapListener(placemarkTapListener)
                     }
                 }

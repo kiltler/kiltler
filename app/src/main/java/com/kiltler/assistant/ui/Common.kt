@@ -33,9 +33,19 @@ import java.util.Locale
 
 private val dateTimeFormat = SimpleDateFormat("d MMMM, HH:mm", Locale("ru"))
 private val dateFormat = SimpleDateFormat("d MMMM yyyy", Locale("ru"))
+private val timeFormat = SimpleDateFormat("HH:mm", Locale("ru"))
 
 fun formatDateTime(millis: Long): String = dateTimeFormat.format(Date(millis))
 fun formatDate(millis: Long): String = dateFormat.format(Date(millis))
+fun formatTime(millis: Long): String = timeFormat.format(Date(millis))
+
+/** true, если указанный момент приходится на сегодняшний день. */
+fun isToday(millis: Long): Boolean {
+    val now = Calendar.getInstance()
+    val day = Calendar.getInstance().apply { timeInMillis = millis }
+    return now.get(Calendar.YEAR) == day.get(Calendar.YEAR) &&
+        now.get(Calendar.DAY_OF_YEAR) == day.get(Calendar.DAY_OF_YEAR)
+}
 
 /**
  * Голосовой ввод через системный распознаватель речи.
