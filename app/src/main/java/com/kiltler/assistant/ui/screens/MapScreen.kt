@@ -129,8 +129,8 @@ fun MapScreen(
         if (scheduledMillis == null) return pinBlue
         val left = scheduledMillis - System.currentTimeMillis()
         return when {
-            left <= HOUR_MS -> pinRed
-            left <= 3 * HOUR_MS -> pinAmber
+            left <= 3 * HOUR_MS -> pinRed
+            left <= 12 * HOUR_MS -> pinAmber
             else -> pinBlue
         }
     }
