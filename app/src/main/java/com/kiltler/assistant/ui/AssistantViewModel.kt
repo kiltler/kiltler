@@ -13,6 +13,7 @@ import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.data.Repository
 import com.kiltler.assistant.data.WorkPlace
 import com.kiltler.assistant.notifications.ReminderScheduler
+import com.kiltler.assistant.sync.SyncManager
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -32,6 +33,13 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = Repository(AppDatabase.get(app))
     private val ctx get() = getApplication<Application>()
+    private val sync = SyncManager(app)
+
+    init {
+        if (sync.enabled) {
+            sync.start(onRemote = { applyRemote(it) }, onEmpty = { pushSync() })
+        }
+    }
 
     val reminders: StateFlow<List<Reminder>> =
         repo.reminders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -52,6 +60,7 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             ReminderScheduler.schedule(ctx, code, saved.timeMillis, saved.title, saved.description)
         }
+        pushSync()
     }
 
     fun toggleReminderDone(reminder: Reminder) =
@@ -60,6 +69,7 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteReminder(reminder: Reminder) = viewModelScope.launch {
         repo.deleteReminder(reminder)
         ReminderScheduler.cancel(ctx, ReminderScheduler.reminderRequestCode(reminder.id))
+        pushSync()
     }
 
     // --- Заказы ---
@@ -67,11 +77,13 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
         val id = repo.upsertOrder(order)
         val saved = if (order.id == 0L) order.copy(id = id) else order
         syncOrderReminder(saved)
+        pushSync()
     }
 
     fun deleteOrder(order: Order) = viewModelScope.launch {
         repo.deleteOrder(order)
         ReminderScheduler.cancel(ctx, ReminderScheduler.orderRequestCode(order.id))
+        pushSync()
     }
 
     private fun syncOrderReminder(order: Order) {
@@ -93,15 +105,18 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
     // --- Материалы ---
     fun saveMaterial(material: Material) = viewModelScope.launch {
         repo.upsertMaterial(material)
+        pushSync()
     }
 
     fun deleteMaterial(material: Material) = viewModelScope.launch {
         repo.deleteMaterial(material)
+        pushSync()
     }
 
     fun adjustMaterial(material: Material, delta: Double) = viewModelScope.launch {
         val updated = material.copy(quantity = (material.quantity + delta).coerceAtLeast(0.0))
         repo.upsertMaterial(updated)
+        pushSync()
     }
 
     /** Добавляет расходники для сплит-системы, пропуская уже существующие по названию. */
@@ -110,15 +125,18 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
         SPLIT_SYSTEM_KIT
             .filter { it.first.lowercase() !in existing }
             .forEach { (name, unit) -> repo.upsertMaterial(Material(name = name, unit = unit)) }
+        pushSync()
     }
 
     // --- Места работы ---
     fun saveWorkPlace(place: WorkPlace) = viewModelScope.launch {
         repo.upsertWorkPlace(place)
+        pushSync()
     }
 
     fun deleteWorkPlace(place: WorkPlace) = viewModelScope.launch {
         repo.deleteWorkPlace(place)
+        pushSync()
     }
 
     // --- Бэкап ---
@@ -143,6 +161,28 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
             onResult(true, "Данные импортированы")
         } catch (e: Exception) {
             onResult(false, "Ошибка импорта: ${e.message}")
+        }
+    }
+
+    // --- Облачная синхронизация ---
+    fun currentSyncCode(): String? = sync.code
+
+    fun enableSync(code: String) {
+        sync.setCode(code, onRemote = { applyRemote(it) }, onEmpty = { pushSync() })
+    }
+
+    fun disableSync() = sync.disable()
+
+    /** Применяет данные, пришедшие из облака. */
+    private fun applyRemote(json: String) {
+        importBackup(json) { _, _ -> }
+    }
+
+    /** Выгружает текущий снимок данных в облако, если синхронизация включена. */
+    private fun pushSync() {
+        if (!sync.enabled) return
+        viewModelScope.launch {
+            sync.push(BackupManager.toJson(buildBackup()))
         }
     }
 }

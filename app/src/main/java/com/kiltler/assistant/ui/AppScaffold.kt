@@ -71,6 +71,7 @@ fun AppScaffold() {
     var editingOrder by remember { mutableStateOf<Order?>(null) }
     var showMaterialDialog by remember { mutableStateOf(false) }
     var editingMaterial by remember { mutableStateOf<Material?>(null) }
+    var showSyncDialog by remember { mutableStateOf(false) }
 
     val reminders by vm.reminders.collectAsStateWithLifecycle()
     val orders by vm.orders.collectAsStateWithLifecycle()
@@ -146,6 +147,13 @@ fun AppScaffold() {
                                     "Расходники добавлены в «Материалы»",
                                     Toast.LENGTH_SHORT
                                 ).show()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Синхронизация") },
+                            onClick = {
+                                menuOpen = false
+                                showSyncDialog = true
                             }
                         )
                     }
@@ -226,4 +234,21 @@ fun AppScaffold() {
                 }
             }
         }
+
+    if (showSyncDialog) {
+        SyncDialog(
+            currentCode = vm.currentSyncCode(),
+            onDismiss = { showSyncDialog = false },
+            onEnable = { code ->
+                vm.enableSync(code)
+                showSyncDialog = false
+                Toast.makeText(context, "Синхронизация включена", Toast.LENGTH_SHORT).show()
+            },
+            onDisable = {
+                vm.disableSync()
+                showSyncDialog = false
+                Toast.makeText(context, "Синхронизация выключена", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
+}
