@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kiltler.assistant.data.Order
 import com.kiltler.assistant.data.OrderStatus
+import com.kiltler.assistant.ui.AppSettings
 import java.util.Calendar
 
 private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
@@ -49,15 +50,18 @@ data class FinanceStats(
 private fun computeFinance(
     orders: List<Order>,
     sinceMillis: Long?,
-    matPct: Int,
-    adsPct: Int
+    settings: AppSettings
 ): FinanceStats {
     val revenue = orders
         .filter { OrderStatus.from(it.status) == OrderStatus.DONE && it.price > 0 }
         .filter { sinceMillis == null || (it.scheduledMillis ?: it.createdAt) >= sinceMillis }
-        .sumOf { it.price }
-    val materials = revenue * matPct / 100.0
-    val ads = revenue * adsPct / 100.0
+        .sumOf { o ->
+            val saleQty = WorkType.parse(o.description)[WorkType.SALE] ?: 0
+            val acBase = if (saleQty > 0) settings.acPriceFor(o.acModel) * saleQty else 0.0
+            (o.price - acBase).coerceAtLeast(0.0)
+        }
+    val materials = revenue * settings.materialsPct / 100.0
+    val ads = revenue * settings.adsPct / 100.0
     return FinanceStats(revenue, materials, ads, revenue - materials - ads)
 }
 
@@ -77,14 +81,13 @@ private fun money(value: Double): String =
 @Composable
 fun FinanceCard(
     orders: List<Order>,
-    matPct: Int,
-    adsPct: Int,
+    settings: AppSettings,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val all = computeFinance(orders, null, matPct, adsPct)
-    val day = computeFinance(orders, startOfToday(), matPct, adsPct)
-    val week = computeFinance(orders, System.currentTimeMillis() - WEEK_MS, matPct, adsPct)
+    val all = computeFinance(orders, null, settings)
+    val day = computeFinance(orders, startOfToday(), settings)
+    val week = computeFinance(orders, System.currentTimeMillis() - WEEK_MS, settings)
 
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -134,15 +137,15 @@ private fun FinanceMini(label: String, value: Double, modifier: Modifier) {
 @Composable
 fun FinanceDialog(
     orders: List<Order>,
-    matPct: Int,
-    adsPct: Int,
+    settings: AppSettings,
     onDismiss: () -> Unit,
     onSave: (Int, Int) -> Unit
 ) {
-    var mat by remember { mutableStateOf(matPct.toString()) }
-    var ads by remember { mutableStateOf(adsPct.toString()) }
+    var mat by remember { mutableStateOf(settings.materialsPct.toString()) }
+    var ads by remember { mutableStateOf(settings.adsPct.toString()) }
     val m = mat.toIntOrNull()?.coerceIn(0, 100) ?: 0
     val a = ads.toIntOrNull()?.coerceIn(0, 100) ?: 0
+    val effective = settings.copy(materialsPct = m, adsPct = a)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -152,12 +155,12 @@ fun FinanceDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                FinanceSection("Сегодня", computeFinance(orders, startOfToday(), m, a))
+                FinanceSection("Сегодня", computeFinance(orders, startOfToday(), effective))
                 FinanceSection(
                     "За неделю",
-                    computeFinance(orders, System.currentTimeMillis() - WEEK_MS, m, a)
+                    computeFinance(orders, System.currentTimeMillis() - WEEK_MS, effective)
                 )
-                FinanceSection("За всё время", computeFinance(orders, null, m, a))
+                FinanceSection("За всё время", computeFinance(orders, null, effective))
 
                 HorizontalDivider()
                 Text(

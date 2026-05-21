@@ -77,8 +77,7 @@ fun ScheduleScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         FinanceCard(
             orders = orders,
-            matPct = settings.materialsPct,
-            adsPct = settings.adsPct,
+            settings = settings,
             onClick = { showFinance = true },
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
         )
@@ -115,8 +114,7 @@ fun ScheduleScreen(
     if (showFinance) {
         FinanceDialog(
             orders = orders,
-            matPct = settings.materialsPct,
-            adsPct = settings.adsPct,
+            settings = settings,
             onDismiss = { showFinance = false },
             onSave = { m, a ->
                 onSaveSettings(settings.copy(materialsPct = m, adsPct = a))

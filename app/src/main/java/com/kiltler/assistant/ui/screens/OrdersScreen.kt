@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Handyman
@@ -42,6 +46,7 @@ import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -61,6 +66,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -181,15 +188,10 @@ fun OrdersScreen(
         .count { OrderStatus.from(it.status) != OrderStatus.DONE }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        OutlinedTextField(
+        SearchField(
             value = query,
             onValueChange = { query = it },
-            placeholder = { Text("Поиск: клиент, телефон, адрес") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
         )
         Row(
             modifier = Modifier.padding(start = 8.dp, end = 16.dp, top = 0.dp),
@@ -246,7 +248,11 @@ fun OrdersScreen(
                     OrderCard(
                         order,
                         onClick = { onEdit(order) },
-                        onDelete = { onDelete(order) }
+                        onDelete = { onDelete(order) },
+                        onMarkDone = { done ->
+                            val newStatus = if (done) OrderStatus.DONE else OrderStatus.NEW
+                            onSave(order.copy(status = newStatus.name))
+                        }
                     )
                 }
             }
@@ -277,7 +283,8 @@ fun OrdersScreen(
 private fun OrderCard(
     order: Order,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onMarkDone: (Boolean) -> Unit
 ) {
     val status = OrderStatus.from(order.status)
     val context = LocalContext.current
@@ -294,6 +301,10 @@ private fun OrderCard(
                     modifier = Modifier.weight(1f)
                 )
                 StatusBadge(status.label, status.color)
+                Checkbox(
+                    checked = status == OrderStatus.DONE,
+                    onCheckedChange = onMarkDone
+                )
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Удалить")
                 }
@@ -426,6 +437,7 @@ private fun InfoLine(icon: ImageVector, text: String) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OrderDialog(
     initial: Order?,
@@ -445,6 +457,10 @@ private fun OrderDialog(
     }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
     var lastAuto by remember { mutableStateOf("") }
+    var acModel by remember { mutableStateOf(initial?.acModel ?: "") }
+    var marginText by remember {
+        mutableStateOf(initial?.acMargin?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "")
+    }
     var status by remember { mutableStateOf(OrderStatus.from(initial?.status ?: OrderStatus.NEW.name)) }
     var scheduled by remember { mutableStateOf(initial?.scheduledMillis) }
     var reminderEnabled by remember { mutableStateOf(initial?.reminderEnabled ?: true) }
@@ -452,9 +468,16 @@ private fun OrderDialog(
     var pickingTimeFor by remember { mutableStateOf<LocalDate?>(null) }
     val scroll = rememberScrollState()
 
-    // Авторасчёт суммы по выбранным работам, пока пользователь не правит сумму вручную.
-    LaunchedEffect(workItems) {
-        val auto = workItems.entries.sumOf { (t, q) -> priceFor(t, settings) * q }
+    // Авторасчёт суммы по выбранным работам и продаже кондиционера.
+    LaunchedEffect(workItems, acModel, marginText) {
+        val saleQty = workItems[WorkType.SALE] ?: 0
+        val acBase = if (saleQty > 0) settings.acPriceFor(acModel) else 0.0
+        val margin = marginText.toDoubleOrNull() ?: 0.0
+        val workSum = workItems.entries.sumOf { (t, q) ->
+            if (t == WorkType.SALE) 0.0 else priceFor(t, settings) * q
+        }
+        val saleSum = if (saleQty > 0) (acBase + margin) * saleQty else 0.0
+        val auto = workSum + saleSum
         val autoStr = if (auto > 0) formatMoney(auto) else ""
         if (priceText.isEmpty() || priceText == lastAuto) {
             priceText = autoStr
@@ -540,6 +563,41 @@ private fun OrderDialog(
                     }
                 }
 
+                val saleQty = workItems[WorkType.SALE] ?: 0
+                if (saleQty > 0) {
+                    SectionHeader("Кондиционер для продажи")
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AC_MODELS.forEach { (code, label) ->
+                            FilterChip(
+                                selected = acModel == code,
+                                onClick = { acModel = code },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                    val basePrice = settings.acPriceFor(acModel)
+                    Text(
+                        if (acModel.isBlank())
+                            "Выберите модель — закупочная цена из настроек учтётся в сумме."
+                        else
+                            "Закупка: ${formatMoney(basePrice)} ₽ × $saleQty " +
+                                "= ${formatMoney(basePrice * saleQty)} ₽. " +
+                                "В прибыль идёт только наценка.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = marginText,
+                        onValueChange = {
+                            marginText = it.filter { c -> c.isDigit() }.take(7)
+                        },
+                        label = { Text("Наценка за единицу, ₽") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { priceText = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
@@ -618,6 +676,8 @@ private fun OrderDialog(
                                 entrance = entrance.trim(),
                                 description = WorkType.join(workItems),
                                 price = price,
+                                acModel = if ((workItems[WorkType.SALE] ?: 0) > 0) acModel else "",
+                                acMargin = marginText.toDoubleOrNull() ?: 0.0,
                                 status = status.name,
                                 scheduledMillis = scheduled,
                                 reminderEnabled = reminderEnabled
@@ -659,6 +719,71 @@ private fun Modifier.androidVerticalScroll(state: androidx.compose.foundation.Sc
     this.verticalScroll(state)
 
 private const val PHONE_PREFIX = "+7"
+
+/** Компактное поле поиска по заказам. */
+@Composable
+private fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Default.Search, contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 8.dp),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium
+                .copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(
+                        "Поиск по заказам",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                inner()
+            }
+        )
+        if (value.isNotEmpty()) {
+            IconButton(
+                onClick = { onValueChange("") },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close, contentDescription = "Очистить",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/** Доступные модели кондиционеров для продажи. */
+private val AC_MODELS = listOf(
+    "MDV7" to "MDV 7",
+    "MDV9" to "MDV 9",
+    "MDV12" to "MDV 12",
+    "MDV24" to "MDV 24",
+    "MULTI" to "Мультисплит"
+)
 
 /** Удерживает префикс +7 и оставляет под ввод не более 10 цифр. */
 private fun formatPhone(input: String): String {

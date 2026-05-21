@@ -26,6 +26,10 @@ data class Order(
     val entrance: String = "",
     val description: String = "",
     val price: Double = 0.0,
+    /** Код модели кондиционера при продаже (MDV7/MDV9/MDV12/MDV24/MULTI или ""). */
+    val acModel: String = "",
+    /** Наценка на одну единицу кондиционера, ₽. */
+    val acMargin: Double = 0.0,
     val status: String = OrderStatus.NEW.name,
     val scheduledMillis: Long? = null,
     val reminderEnabled: Boolean = true,

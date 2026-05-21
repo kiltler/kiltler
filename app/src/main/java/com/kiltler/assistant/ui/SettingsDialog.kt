@@ -29,10 +29,18 @@ fun SettingsDialog(
     onDismiss: () -> Unit,
     onSave: (AppSettings) -> Unit
 ) {
-    var cleaning by remember { mutableStateOf(initial.cleaningPrice.toLong().toString()) }
-    var install by remember { mutableStateOf(initial.installPrice.toLong().toString()) }
+    var cleaning by remember { mutableStateOf(initial.cleaningPrice.priceText()) }
+    var refill by remember { mutableStateOf(initial.refillPrice.priceText()) }
+    var install by remember { mutableStateOf(initial.installPrice.priceText()) }
+    var preInstall by remember { mutableStateOf(initial.preInstallPrice.priceText()) }
+    var demount by remember { mutableStateOf(initial.demountPrice.priceText()) }
     var mat by remember { mutableStateOf(initial.materialsPct.toString()) }
     var ads by remember { mutableStateOf(initial.adsPct.toString()) }
+    var acMdv7 by remember { mutableStateOf(initial.acPriceMdv7.priceText()) }
+    var acMdv9 by remember { mutableStateOf(initial.acPriceMdv9.priceText()) }
+    var acMdv12 by remember { mutableStateOf(initial.acPriceMdv12.priceText()) }
+    var acMdv24 by remember { mutableStateOf(initial.acPriceMdv24.priceText()) }
+    var acMulti by remember { mutableStateOf(initial.acPriceMulti.priceText()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -42,33 +50,28 @@ fun SettingsDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    "Цены за единицу, ₽",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                OutlinedTextField(
-                    value = cleaning,
-                    onValueChange = { cleaning = it.filter(Char::isDigit).take(6) },
-                    label = { Text("Чистка кондиционера") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = install,
-                    onValueChange = { install = it.filter(Char::isDigit).take(6) },
-                    label = { Text("Установка") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                SectionTitle("Цены за работу, ₽")
+                PriceField(cleaning, { cleaning = it }, "Чистка")
+                PriceField(refill, { refill = it }, "Заправка")
+                PriceField(install, { install = it }, "Установка")
+                PriceField(preInstall, { preInstall = it }, "Закладка")
+                PriceField(demount, { demount = it }, "Демонтаж")
+
                 HorizontalDivider()
+                SectionTitle("Цены кондиционеров (закупка), ₽")
                 Text(
-                    "Отчисления, % от выручки",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
+                    "Используются как себестоимость при продаже. В прибыль идёт только наценка, которую вы вводите в заказе.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                PriceField(acMdv7, { acMdv7 = it }, "MDV 7")
+                PriceField(acMdv9, { acMdv9 = it }, "MDV 9")
+                PriceField(acMdv12, { acMdv12 = it }, "MDV 12")
+                PriceField(acMdv24, { acMdv24 = it }, "MDV 24")
+                PriceField(acMulti, { acMulti = it }, "Мультисплит")
+
+                HorizontalDivider()
+                SectionTitle("Отчисления, % от выручки")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = mat,
@@ -87,21 +90,24 @@ fun SettingsDialog(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                Text(
-                    "Эти настройки используются для расчёта суммы заказа и финансов на главном экране.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 onSave(
                     AppSettings(
-                        cleaningPrice = cleaning.toDoubleOrNull() ?: 0.0,
-                        installPrice = install.toDoubleOrNull() ?: 0.0,
+                        cleaningPrice = cleaning.parsePrice(),
+                        refillPrice = refill.parsePrice(),
+                        installPrice = install.parsePrice(),
+                        preInstallPrice = preInstall.parsePrice(),
+                        demountPrice = demount.parsePrice(),
                         materialsPct = (mat.toIntOrNull() ?: 0).coerceIn(0, 100),
-                        adsPct = (ads.toIntOrNull() ?: 0).coerceIn(0, 100)
+                        adsPct = (ads.toIntOrNull() ?: 0).coerceIn(0, 100),
+                        acPriceMdv7 = acMdv7.parsePrice(),
+                        acPriceMdv9 = acMdv9.parsePrice(),
+                        acPriceMdv12 = acMdv12.parsePrice(),
+                        acPriceMdv24 = acMdv24.parsePrice(),
+                        acPriceMulti = acMulti.parsePrice()
                     )
                 )
             }) { Text("Сохранить") }
@@ -109,3 +115,28 @@ fun SettingsDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
 }
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun PriceField(value: String, onValueChange: (String) -> Unit, label: String) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { onValueChange(it.filter(Char::isDigit).take(7)) },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+private fun Double.priceText(): String = if (this > 0) toLong().toString() else ""
+
+private fun String.parsePrice(): Double = toDoubleOrNull() ?: 0.0
