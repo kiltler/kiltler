@@ -39,15 +39,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /** v4: добавлена таблица «расходы». */
+        /** v4: добавлена таблица «расходы». Схема должна точно совпадать с той,
+         *  что генерирует Room для entity Expense — иначе валидация падает
+         *  и срабатывает fallbackToDestructiveMigration. */
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS expenses (" +
-                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                        "amount REAL NOT NULL, " +
-                        "note TEXT NOT NULL DEFAULT '', " +
-                        "createdAtMillis INTEGER NOT NULL DEFAULT 0)"
+                    "CREATE TABLE IF NOT EXISTS `expenses` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`amount` REAL NOT NULL, " +
+                        "`note` TEXT NOT NULL, " +
+                        "`createdAtMillis` INTEGER NOT NULL)"
                 )
             }
         }
