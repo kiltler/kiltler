@@ -46,9 +46,9 @@ import java.time.ZoneId
 import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
 
-private const val OVERLOAD_HOURS = 12.0   // максимум для дня (9–21)
+private const val OVERLOAD_HOURS = 10.0   // > 10 ч — критически плотный день
 private const val NOISY_LIMIT = 10.0      // 9–13 + 15–21, без «тихого часа»
-private const val HIGH_HOURS = 8.0
+private const val HIGH_HOURS = 8.0        // ≥ 8 ч — плотный день
 private const val MEDIUM_HOURS = 4.0
 
 enum class LoadLevel { FREE, LOW, MEDIUM, HIGH, OVERLOAD }
@@ -64,8 +64,8 @@ data class DayLoad(
     val level: LoadLevel get() = when {
         total == 0.0 -> LoadLevel.FREE
         noisy > NOISY_LIMIT || total > OVERLOAD_HOURS -> LoadLevel.OVERLOAD
-        total > HIGH_HOURS -> LoadLevel.HIGH
-        total > MEDIUM_HOURS -> LoadLevel.MEDIUM
+        total >= HIGH_HOURS -> LoadLevel.HIGH
+        total >= MEDIUM_HOURS -> LoadLevel.MEDIUM
         else -> LoadLevel.LOW
     }
 }
@@ -103,7 +103,7 @@ private fun loadColor(level: LoadLevel): Color = when (level) {
     LoadLevel.LOW -> Color(0xFFC8E6C9)
     LoadLevel.MEDIUM -> Color(0xFFFFE082)
     LoadLevel.HIGH -> Color(0xFFFFAB91)
-    LoadLevel.OVERLOAD -> Color(0xFFEF5350)
+    LoadLevel.OVERLOAD -> Color(0xFFE53935)
 }
 
 private val CellTextDark = Color(0xFF1A1C1E)
