@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +87,12 @@ fun AppScaffold() {
     val orders by vm.orders.collectAsStateWithLifecycle()
     val workPlaces by vm.workPlaces.collectAsStateWithLifecycle()
     val expenses by vm.expenses.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        vm.syncEvents.collect { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+        }
+    }
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()

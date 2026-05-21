@@ -15,8 +15,11 @@ import com.kiltler.assistant.data.Repository
 import com.kiltler.assistant.data.WorkPlace
 import com.kiltler.assistant.notifications.ReminderScheduler
 import com.kiltler.assistant.sync.SyncManager
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -35,6 +38,10 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = Repository(AppDatabase.get(app))
     private val ctx get() = getApplication<Application>()
     private val sync = SyncManager(app)
+
+    private val _syncEvents = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    /** Сообщения для пользователя про облачную синхронизацию (например, ошибки парсинга). */
+    val syncEvents: SharedFlow<String> = _syncEvents.asSharedFlow()
 
     init {
         if (sync.enabled) {
@@ -190,9 +197,11 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
 
     fun disableSync() = sync.disable()
 
-    /** Применяет данные, пришедшие из облака. */
+    /** Применяет данные, пришедшие из облака. Ошибки парсинга больше не глотаем. */
     private fun applyRemote(json: String) {
-        importBackup(json) { _, _ -> }
+        importBackup(json) { ok, message ->
+            if (!ok) _syncEvents.tryEmit("Облачные данные: $message")
+        }
     }
 
     /** Выгружает текущий снимок данных в облако, если синхронизация включена. */
