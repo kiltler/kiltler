@@ -2,12 +2,23 @@ package com.kiltler.assistant.ui
 
 import android.content.Context
 import android.content.Intent
-import android.location.Address
-import android.location.Geocoder
 import android.net.Uri
+import com.yandex.mapkit.GeoObject
+import com.yandex.mapkit.geometry.BoundingBox
+import com.yandex.mapkit.geometry.Geometry
+import com.yandex.mapkit.geometry.Point
+import com.yandex.mapkit.search.Response
+import com.yandex.mapkit.search.SearchFactory
+import com.yandex.mapkit.search.SearchManager
+import com.yandex.mapkit.search.SearchManagerType
+import com.yandex.mapkit.search.SearchOptions
+import com.yandex.mapkit.search.SearchType
+import com.yandex.mapkit.search.Session
+import com.yandex.runtime.Error
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.util.Locale
+import kotlin.coroutines.resume
 
 /** Открывает Яндекс Карты с автомобильным маршрутом до координат. */
 fun openYandexDrivingRoute(context: Context, latitude: Double, longitude: Double) {
@@ -53,31 +64,32 @@ object KhabarovskRegion {
 }
 
 /**
- * Превращает текстовый адрес в координаты через системный геокодер.
+ * Геокодирует адрес через Yandex MapKit Search SDK — те же результаты,
+ * что и в самих Яндекс Картах. Системный Android Geocoder под капотом
+ * использует Google и иногда расходится с Яндексом на дальневосточных
+ * адресах, что и приводило к промахам при копировании адреса из карт.
  *
- * Адреса Хабаровского края имеют приоритет: сначала идёт поиск строго
- * в границах региона, и лишь затем — обычный поиск как запасной вариант.
- * Возвращает null, если адрес не найден или геокодер недоступен.
+ * Поиск идёт с приоритетом Хабаровского края: сначала с ограничительной
+ * рамкой региона, и только если ничего не нашлось — без неё.
  */
-suspend fun geocodeAddress(context: Context, query: String): GeocodeResult? =
-    withContext(Dispatchers.IO) {
-        val trimmed = query.trim()
-        if (trimmed.isBlank() || !Geocoder.isPresent()) return@withContext null
-        val geocoder = Geocoder(context, Locale("ru"))
+suspend fun geocodeAddress(context: Context, query: String): GeocodeResult? {
+    val trimmed = query.trim()
+    if (trimmed.isBlank()) return null
+    val queries = listOf(qualifyAddress(trimmed), trimmed).distinct()
 
-        // Запросы по убыванию приоритета: вариант с уточнением города — первым.
-        val queries = listOf(qualifyAddress(trimmed), trimmed).distinct()
-
-        // 1. Совпадение строго в границах Хабаровского края.
+    return withContext(Dispatchers.Main) {
+        val manager = searchManager(context)
+        // 1. С приоритетом региона.
         for (q in queries) {
-            regionMatch(geocoder, q)?.let { return@withContext it }
+            yandexGeocode(manager, q, regionBias = true)?.let { return@withContext it }
         }
-        // 2. Запасной вариант — поиск без географических ограничений.
+        // 2. Запасной вариант — поиск без географической рамки.
         for (q in queries) {
-            plainMatch(geocoder, q)?.let { return@withContext it }
+            yandexGeocode(manager, q, regionBias = false)?.let { return@withContext it }
         }
         null
     }
+}
 
 private val KNOWN_CITIES = listOf("хабаровск", "комсомольск", "амурск")
 
@@ -92,32 +104,81 @@ fun qualifyAddress(query: String): String {
     else "Хабаровск, $trimmed"
 }
 
-/** Ищет адрес с привязкой к краю и оставляет только попавшие в его границы. */
-private fun regionMatch(geocoder: Geocoder, query: String): GeocodeResult? = try {
-    @Suppress("DEPRECATION")
-    val matches = geocoder.getFromLocationName(
-        query, 5,
-        KhabarovskRegion.SOUTH, KhabarovskRegion.WEST,
-        KhabarovskRegion.NORTH, KhabarovskRegion.EAST
-    ).orEmpty()
-    matches.firstOrNull { KhabarovskRegion.contains(it.latitude, it.longitude) }
-        ?.let { toResult(it, query) }
-} catch (e: Exception) {
-    null
+// --- Yandex Search SDK ---
+
+@Volatile
+private var initialized = false
+
+@Volatile
+private var cachedManager: SearchManager? = null
+
+/** Лениво инициализирует Search SDK на главном потоке и кэширует менеджер. */
+private fun searchManager(context: Context): SearchManager {
+    cachedManager?.let { return it }
+    synchronized(Geocoding) {
+        cachedManager?.let { return it }
+        if (!initialized) {
+            SearchFactory.initialize(context.applicationContext)
+            initialized = true
+        }
+        return SearchFactory.getInstance()
+            .createSearchManager(SearchManagerType.COMBINED)
+            .also { cachedManager = it }
+    }
 }
 
-/** Обычный поиск без ограничений — запасной вариант. */
-private fun plainMatch(geocoder: Geocoder, query: String): GeocodeResult? = try {
-    @Suppress("DEPRECATION")
-    val matches = geocoder.getFromLocationName(query, 1).orEmpty()
-    matches.firstOrNull()?.let { toResult(it, query) }
-} catch (e: Exception) {
-    null
+/** Узкая обёртка над `SearchManager.submit` в виде suspend-функции. */
+private suspend fun yandexGeocode(
+    manager: SearchManager,
+    query: String,
+    regionBias: Boolean
+): GeocodeResult? = suspendCancellableCoroutine { cont ->
+    val options = SearchOptions()
+        .setSearchTypes(SearchType.GEO.value)
+        .setResultPageSize(5)
+    val geometry: Geometry = if (regionBias) {
+        Geometry.fromBoundingBox(
+            BoundingBox(
+                Point(KhabarovskRegion.SOUTH, KhabarovskRegion.WEST),
+                Point(KhabarovskRegion.NORTH, KhabarovskRegion.EAST)
+            )
+        )
+    } else {
+        // Точка-затравка: центр Хабаровска — Search всё равно вернёт глобальные результаты,
+        // но при равных весах выберет ближайшие к нам.
+        Geometry.fromPoint(Point(KhabarovskRegion.CENTER_LAT, KhabarovskRegion.CENTER_LON))
+    }
+
+    val listener = object : Session.SearchListener {
+        override fun onSearchResponse(response: Response) {
+            val candidates = response.collection.children
+                .mapNotNull { it.obj }
+                .mapNotNull(::toResult)
+
+            val best = if (regionBias) {
+                candidates.firstOrNull { KhabarovskRegion.contains(it.latitude, it.longitude) }
+                    ?: candidates.firstOrNull()
+            } else {
+                candidates.firstOrNull()
+            }
+            if (cont.isActive) cont.resume(best)
+        }
+
+        override fun onSearchError(error: Error) {
+            if (cont.isActive) cont.resume(null)
+        }
+    }
+
+    val session: Session = manager.submit(query, geometry, options, listener)
+    cont.invokeOnCancellation { session.cancel() }
 }
 
-private fun toResult(address: Address, fallback: String): GeocodeResult {
-    val name = (0..address.maxAddressLineIndex)
-        .joinToString(", ") { address.getAddressLine(it) }
-        .ifBlank { fallback }
-    return GeocodeResult(name, address.latitude, address.longitude)
+private fun toResult(obj: GeoObject): GeocodeResult? {
+    val point = obj.geometry.firstOrNull()?.point ?: return null
+    val name = (obj.name ?: obj.descriptionText)?.takeIf { it.isNotBlank() }
+        ?: "${point.latitude}, ${point.longitude}"
+    return GeocodeResult(name, point.latitude, point.longitude)
 }
+
+/** Маркер для синхронизации ленивой инициализации. */
+private object Geocoding
