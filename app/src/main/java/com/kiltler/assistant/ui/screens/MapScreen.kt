@@ -464,7 +464,10 @@ private fun VoiceAddressDialog(
             searching = false
             if (result != null) {
                 found = result
-                status = "Найдено: %.5f, %.5f".format(result.latitude, result.longitude)
+                // displayName выводится отдельно — сразу видно, если геокодер
+                // нашёл совсем другой адрес (например, fuzzy-промах по похожему).
+                status = "Найдено [Я]: ${result.displayName}\n%.5f, %.5f"
+                    .format(result.latitude, result.longitude)
             } else {
                 status = "Адрес не найден. Уточните формулировку и повторите."
             }

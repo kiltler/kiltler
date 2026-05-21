@@ -20,6 +20,10 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
+/** Идентификатор провайдера геокодирования — нужен, чтобы в UI можно было убедиться,
+ *  что приложение действительно использует Яндекс, а не системный Geocoder. */
+const val GEOCODER_TAG = "yandex-mapkit-search"
+
 /** Открывает Яндекс Карты с автомобильным маршрутом до координат. */
 fun openYandexDrivingRoute(context: Context, latitude: Double, longitude: Double) {
     val point = "$latitude,$longitude"
