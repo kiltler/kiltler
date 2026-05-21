@@ -43,6 +43,7 @@ import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.ui.screens.MapScreen
 import com.kiltler.assistant.ui.screens.OrdersScreen
 import com.kiltler.assistant.ui.screens.ScheduleScreen
+import java.util.Calendar
 import kotlinx.coroutines.launch
 
 private enum class Tab(val title: String, val icon: ImageVector) {
@@ -59,6 +60,16 @@ fun AppScaffold() {
     val scope = rememberCoroutineScope()
 
     var tab by remember { mutableStateOf(Tab.SCHEDULE) }
+    var dayFilter by remember {
+        mutableStateOf<Long?>(
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        )
+    }
     var menuOpen by remember { mutableStateOf(false) }
 
     var showReminderDialog by remember { mutableStateOf(false) }
@@ -188,6 +199,9 @@ fun AppScaffold() {
                     )
                     Tab.ORDERS -> OrdersScreen(
                         orders = orders,
+                        dayFilter = dayFilter,
+                        onDayChange = { dayFilter = it },
+                        onOpenDayMap = { tab = Tab.MAP },
                         editing = editingOrder,
                         showDialog = showOrderDialog,
                         onDismissDialog = { showOrderDialog = false },
@@ -198,6 +212,7 @@ fun AppScaffold() {
                     Tab.MAP -> MapScreen(
                         workPlaces = workPlaces,
                         orders = orders,
+                        dayFilter = dayFilter,
                         onSave = vm::saveWorkPlace,
                         onSaveReminder = vm::saveReminder,
                         onDelete = vm::deleteWorkPlace

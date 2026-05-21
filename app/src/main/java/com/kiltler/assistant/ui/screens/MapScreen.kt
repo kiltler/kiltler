@@ -96,6 +96,7 @@ private const val HOUR_MS = 3_600_000L
 fun MapScreen(
     workPlaces: List<WorkPlace>,
     orders: List<Order>,
+    dayFilter: Long?,
     onSave: (WorkPlace) -> Unit,
     onSaveReminder: (Reminder) -> Unit,
     onDelete: (WorkPlace) -> Unit
@@ -271,18 +272,25 @@ fun MapScreen(
                         addTapListener(placemarkTapListener)
                     }
                 }
+                val dayEnd = dayFilter?.let { it + 24L * 60 * 60 * 1000 }
                 orderPoints.forEach { (order, point) ->
+                    val scheduled = order.scheduledMillis
+                    if (dayFilter != null && (scheduled == null ||
+                            scheduled !in dayFilter until dayEnd!!)) {
+                        return@forEach
+                    }
                     placemarks.addPlacemark().apply {
                         geometry = point
                         userData = order
                         setIcon(
-                            pinForOrder(order.scheduledMillis),
+                            pinForOrder(scheduled),
                             IconStyle().apply { anchor = PointF(0.5f, 1.0f) }
                         )
-                        val scheduled = order.scheduledMillis
-                        if (scheduled != null && isToday(scheduled)) {
+                        val showTime = scheduled != null &&
+                            (dayFilter != null || isToday(scheduled))
+                        if (showTime) {
                             setText(
-                                "(${formatTime(scheduled)})",
+                                "(${formatTime(scheduled!!)})",
                                 TextStyle().apply {
                                     size = 11f
                                     placement = TextStyle.Placement.TOP

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Handyman
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Plumbing
@@ -75,8 +76,6 @@ import com.kiltler.assistant.ui.formatDateTime
 import com.kiltler.assistant.ui.formatTime
 import com.kiltler.assistant.ui.geocodeAddress
 import com.kiltler.assistant.ui.openYandexDrivingRoute
-import com.kiltler.assistant.ui.pickDateTime
-import com.kiltler.assistant.ui.pickTime
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -138,6 +137,9 @@ enum class WorkType(
 @Composable
 fun OrdersScreen(
     orders: List<Order>,
+    dayFilter: Long?,
+    onDayChange: (Long?) -> Unit,
+    onOpenDayMap: () -> Unit,
     editing: Order?,
     showDialog: Boolean,
     onDismissDialog: () -> Unit,
@@ -146,7 +148,6 @@ fun OrdersScreen(
     onEdit: (Order) -> Unit
 ) {
     var filter by remember { mutableStateOf<OrderStatus?>(null) }
-    var dayFilter by remember { mutableStateOf<Long?>(startOfToday()) }
     var showCalendar by remember { mutableStateOf(false) }
 
     val dayFiltered = if (dayFilter == null) orders
@@ -175,10 +176,13 @@ fun OrdersScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = onOpenDayMap) {
+                Icon(Icons.Default.Map, contentDescription = "Карта дня")
+            }
             if (dayFilter != null) {
-                TextButton(onClick = { dayFilter = null }) { Text("Все дни") }
+                TextButton(onClick = { onDayChange(null) }) { Text("Все дни") }
             } else {
-                TextButton(onClick = { dayFilter = startOfToday() }) { Text("Сегодня") }
+                TextButton(onClick = { onDayChange(startOfToday()) }) { Text("Сегодня") }
             }
         }
         LazyRow(
@@ -234,7 +238,7 @@ fun OrdersScreen(
         OrdersCalendarDialog(
             orders = orders,
             selectedDay = dayFilter ?: startOfToday(),
-            onSelect = { dayFilter = it; showCalendar = false },
+            onSelect = { onDayChange(it); showCalendar = false },
             onDismiss = { showCalendar = false }
         )
     }
@@ -415,6 +419,7 @@ private fun OrderDialog(
     var scheduled by remember { mutableStateOf(initial?.scheduledMillis) }
     var reminderEnabled by remember { mutableStateOf(initial?.reminderEnabled ?: true) }
     var pickingDate by remember { mutableStateOf(false) }
+    var pickingTimeFor by remember { mutableStateOf<LocalDate?>(null) }
     val scroll = rememberScrollState()
 
     // Авторасчёт суммы по выбранным работам, пока пользователь не правит сумму вручную.
@@ -603,21 +608,19 @@ private fun OrderDialog(
             confirmLabel = "Выбрать",
             onSelect = { dayMs ->
                 pickingDate = false
-                val previous = Calendar.getInstance().apply {
-                    timeInMillis = scheduled ?: System.currentTimeMillis()
-                }
-                val target = Calendar.getInstance().apply {
-                    timeInMillis = dayMs
-                    set(Calendar.HOUR_OF_DAY, previous.get(Calendar.HOUR_OF_DAY))
-                    set(Calendar.MINUTE, previous.get(Calendar.MINUTE))
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }
-                pickTime(context, target.timeInMillis) { picked ->
-                    scheduled = picked
-                }
+                pickingTimeFor = Instant.ofEpochMilli(dayMs)
+                    .atZone(ZoneId.systemDefault()).toLocalDate()
             },
             onDismiss = { pickingDate = false }
+        )
+    }
+
+    pickingTimeFor?.let { date ->
+        TimeSlotDialog(
+            date = date,
+            otherOrders = allOrders.filter { it.id != (initial?.id ?: -1L) },
+            onPick = { scheduled = it },
+            onDismiss = { pickingTimeFor = null }
         )
     }
 }
