@@ -143,7 +143,10 @@ private suspend fun yandexGeocode(
     regionBias: Boolean
 ): GeocodeResult? = suspendCancellableCoroutine { cont ->
     val options = SearchOptions()
-        .setSearchTypes(SearchType.GEO.value)
+        // GEO находит улицы и дома, BIZ — организации и POI вроде
+        // «Клиника Эксперт» или «Арена Ерофей». Без BIZ такие
+        // названия не разрешаются в координаты.
+        .setSearchTypes(SearchType.GEO.value or SearchType.BIZ.value)
         .setResultPageSize(5)
     val geometry: Geometry = if (regionBias) {
         Geometry.fromBoundingBox(
