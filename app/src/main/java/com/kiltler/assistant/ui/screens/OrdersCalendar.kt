@@ -87,23 +87,27 @@ fun computeDayLoad(orders: List<Order>, date: LocalDate): DayLoad {
     var total = 0.0
     var noisy = 0.0
     for (order in dayOrders) {
-        for (type in WorkType.parse(order.description)) {
-            if (type.hours <= 0.0) continue
-            byType[type] = (byType[type] ?: 0.0) + type.hours
-            total += type.hours
-            if (type.noisy) noisy += type.hours
+        for ((type, qty) in WorkType.parse(order.description)) {
+            val hrs = type.hours * qty
+            if (hrs <= 0.0) continue
+            byType[type] = (byType[type] ?: 0.0) + hrs
+            total += hrs
+            if (type.noisy) noisy += hrs
         }
     }
     return DayLoad(total, noisy, byType.toMap(), dayOrders.size)
 }
 
-private fun loadColor(level: LoadLevel, surface: Color): Color = when (level) {
-    LoadLevel.FREE -> surface
+private fun loadColor(level: LoadLevel): Color = when (level) {
+    LoadLevel.FREE -> Color(0xFFF0F2F5)
     LoadLevel.LOW -> Color(0xFFC8E6C9)
     LoadLevel.MEDIUM -> Color(0xFFFFE082)
     LoadLevel.HIGH -> Color(0xFFFFAB91)
     LoadLevel.OVERLOAD -> Color(0xFFEF5350)
 }
+
+private val CellTextDark = Color(0xFF1A1C1E)
+private val CellTextMuted = Color(0xFF9CA3AF)
 
 @Composable
 fun OrdersCalendarDialog(
@@ -202,7 +206,6 @@ private fun MonthGrid(
     val firstOfMonth = month.atDay(1)
     val cellsBefore = firstOfMonth.dayOfWeek.value - 1 // Mon=1
     val gridStart = firstOfMonth.minusDays(cellsBefore.toLong())
-    val surface = MaterialTheme.colorScheme.surface
     for (row in 0 until 6) {
         Row {
             for (col in 0 until 7) {
@@ -215,7 +218,6 @@ private fun MonthGrid(
                     load = load,
                     isToday = date == today,
                     isSelected = date == selected,
-                    surface = surface,
                     onClick = { onClick(date) },
                     modifier = Modifier.weight(1f)
                 )
@@ -231,17 +233,17 @@ private fun DayCell(
     load: DayLoad,
     isToday: Boolean,
     isSelected: Boolean,
-    surface: Color,
     onClick: () -> Unit,
     modifier: Modifier
 ) {
-    val bg = if (inMonth) loadColor(load.level, surface) else surface
+    val bg = if (inMonth) loadColor(load.level) else Color(0xFFF0F2F5)
     val border = when {
         isSelected -> MaterialTheme.colorScheme.primary
-        isToday -> MaterialTheme.colorScheme.outline
+        isToday -> Color(0xFF1A1C1E)
         else -> Color.Transparent
     }
     val shape = RoundedCornerShape(10.dp)
+    val textColor = if (inMonth) CellTextDark else CellTextMuted
     Box(
         modifier = modifier
             .aspectRatio(1f)
@@ -255,17 +257,16 @@ private fun DayCell(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                color = if (inMonth) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
+                color = textColor
             )
             load.dominant?.let { type ->
                 Icon(
                     type.icon,
                     contentDescription = null,
-                    modifier = Modifier.size(12.dp),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                    modifier = Modifier.size(14.dp),
+                    tint = CellTextDark
                 )
             }
         }
@@ -365,6 +366,27 @@ private fun DaySummary(orders: List<Order>, date: LocalDate) {
     }
 }
 
-private fun formatHours(h: Double): String =
+internal fun formatHours(h: Double): String =
     if (h % 1.0 == 0.0) h.toInt().toString()
     else String.format(Locale.US, "%.1f", h)
+
+/** Длительность всех работ заказа в миллисекундах. */
+fun totalDurationMs(items: Map<WorkType, Int>): Long {
+    val hours = items.entries.sumOf { (t, q) -> t.hours * q }
+    return (hours * 60 * 60 * 1000).toLong()
+}
+
+/** Первый активный заказ из [others], чей слот пересекается с [start..start+durationMs]. */
+fun findConflict(others: List<Order>, start: Long, durationMs: Long): Order? {
+    if (durationMs <= 0) return null
+    val end = start + durationMs
+    return others.firstOrNull { o ->
+        val oStart = o.scheduledMillis ?: return@firstOrNull false
+        val oStatus = OrderStatus.from(o.status)
+        if (oStatus == OrderStatus.DONE || oStatus == OrderStatus.CANCELLED) return@firstOrNull false
+        val oDur = totalDurationMs(WorkType.parse(o.description))
+        if (oDur <= 0) return@firstOrNull false
+        val oEnd = oStart + oDur
+        start < oEnd && end > oStart
+    }
+}

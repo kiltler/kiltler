@@ -11,25 +11,30 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Handyman
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Plumbing
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.WorkOutline
@@ -46,6 +51,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,40 +72,65 @@ import com.kiltler.assistant.ui.SectionHeader
 import com.kiltler.assistant.ui.StatusBadge
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDateTime
+import com.kiltler.assistant.ui.formatTime
 import com.kiltler.assistant.ui.geocodeAddress
 import com.kiltler.assistant.ui.openYandexDrivingRoute
 import com.kiltler.assistant.ui.pickDateTime
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-/** Виды работ по заказу — можно выбрать несколько одновременно. */
+/** Виды работ по заказу — каждая запоминает количество и стандартную цену. */
 enum class WorkType(
     val label: String,
     val icon: ImageVector,
-    /** Среднее время на работу в часах — используется для расчёта загрузки дня. */
+    /** Среднее время на одну единицу работы в часах. */
     val hours: Double,
     /** true — шумные работы (нельзя в «тихий час» 13:00–15:00). */
-    val noisy: Boolean
+    val noisy: Boolean,
+    /** Стандартная цена за единицу, ₽ (0 — без авторасчёта). */
+    val price: Double
 ) {
-    CLEANING("Чистка", Icons.Default.CleaningServices, 1.0, false),
-    REFILL("Заправка", Icons.Default.Colorize, 0.5, false),
-    INSTALL("Установка", Icons.Default.Build, 2.0, true),
-    PRE_INSTALL("Закладка", Icons.Default.Plumbing, 2.5, true),
-    SALE("Продажа", Icons.Default.Sell, 0.0, false);
+    CLEANING("Чистка", Icons.Default.CleaningServices, 0.5, false, 3500.0),
+    REFILL("Заправка", Icons.Default.Colorize, 0.5, false, 0.0),
+    INSTALL("Установка", Icons.Default.Build, 2.0, true, 11500.0),
+    PRE_INSTALL("Закладка", Icons.Default.Plumbing, 2.5, true, 0.0),
+    DEMOUNT("Демонтаж", Icons.Default.Handyman, 0.5, true, 0.0),
+    SALE("Продажа", Icons.Default.Sell, 0.0, false, 0.0);
 
     companion object {
-        /** Разбирает поле описания заказа в список выбранных видов работ. */
-        fun parse(raw: String): List<WorkType> {
-            val parts = raw.split(",").map { it.trim() }
-            return entries.filter { it.label in parts }
+        private val ITEM_PATTERN = Regex("""^(.+?)(?:\s+[x×]\s*(\d+))?\s*$""")
+
+        /** Разбирает поле описания в карту «вид работы → количество». */
+        fun parse(raw: String): Map<WorkType, Int> {
+            val result = mutableMapOf<WorkType, Int>()
+            raw.split(",").forEach { piece ->
+                val trimmed = piece.trim()
+                if (trimmed.isEmpty()) return@forEach
+                val match = ITEM_PATTERN.matchEntire(trimmed) ?: return@forEach
+                val label = match.groupValues[1].trim()
+                val qty = match.groupValues[2].toIntOrNull() ?: 1
+                val type = entries.firstOrNull { it.label == label } ?: return@forEach
+                if (qty > 0) result[type] = qty
+            }
+            return result
         }
 
         /** Собирает строку для хранения в поле описания заказа. */
-        fun join(types: Collection<WorkType>): String =
-            entries.filter { it in types }.joinToString(", ") { it.label }
+        fun join(items: Map<WorkType, Int>): String =
+            entries
+                .mapNotNull { type ->
+                    val qty = items[type] ?: 0
+                    if (qty > 0) type to qty else null
+                }
+                .joinToString(", ") { (type, qty) ->
+                    if (qty <= 1) type.label else "${type.label} x$qty"
+                }
     }
 }
 
@@ -192,6 +223,7 @@ fun OrdersScreen(
     if (showDialog) {
         OrderDialog(
             initial = editing,
+            allOrders = orders,
             onDismiss = onDismissDialog,
             onSave = { onSave(it); onDismissDialog() }
         )
@@ -301,16 +333,18 @@ private fun OrderCard(
     }
 }
 
-/** Перечень видов работ в карточке заказа — иконка плюс название. */
+/** Перечень видов работ в карточке заказа — иконка, название и количество. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WorkTypeChips(types: List<WorkType>) {
+private fun WorkTypeChips(items: Map<WorkType, Int>) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.padding(top = 6.dp)
     ) {
-        types.forEach { type ->
+        WorkType.entries.forEach { type ->
+            val qty = items[type] ?: return@forEach
+            if (qty <= 0) return@forEach
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     type.icon, contentDescription = null,
@@ -318,7 +352,7 @@ private fun WorkTypeChips(types: List<WorkType>) {
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    " ${type.label}",
+                    if (qty > 1) " ${type.label} ×$qty" else " ${type.label}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -358,10 +392,10 @@ private fun InfoLine(icon: ImageVector, text: String) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OrderDialog(
     initial: Order?,
+    allOrders: List<Order>,
     onDismiss: () -> Unit,
     onSave: (Order) -> Unit
 ) {
@@ -371,14 +405,25 @@ private fun OrderDialog(
     var address by remember { mutableStateOf(initial?.address ?: "") }
     var apartment by remember { mutableStateOf(initial?.apartment ?: "") }
     var entrance by remember { mutableStateOf(initial?.entrance ?: "") }
-    var workTypes by remember {
-        mutableStateOf(WorkType.parse(initial?.description ?: "").toSet())
+    var workItems by remember {
+        mutableStateOf(WorkType.parse(initial?.description ?: ""))
     }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
+    var lastAuto by remember { mutableStateOf("") }
     var status by remember { mutableStateOf(OrderStatus.from(initial?.status ?: OrderStatus.NEW.name)) }
     var scheduled by remember { mutableStateOf(initial?.scheduledMillis) }
     var reminderEnabled by remember { mutableStateOf(initial?.reminderEnabled ?: true) }
     val scroll = rememberScrollState()
+
+    // Авторасчёт суммы по выбранным работам, пока пользователь не правит сумму вручную.
+    LaunchedEffect(workItems) {
+        val auto = workItems.entries.sumOf { (t, q) -> t.price * q }
+        val autoStr = if (auto > 0) formatMoney(auto) else ""
+        if (priceText.isEmpty() || priceText == lastAuto) {
+            priceText = autoStr
+        }
+        lastAuto = autoStr
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -417,22 +462,44 @@ private fun OrderDialog(
                 }
 
                 SectionHeader("Виды работ")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     WorkType.entries.forEach { type ->
-                        FilterChip(
-                            selected = type in workTypes,
-                            onClick = {
-                                workTypes = if (type in workTypes) workTypes - type
-                                else workTypes + type
-                            },
-                            label = { Text(type.label) },
-                            leadingIcon = {
-                                Icon(
-                                    type.icon, contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                        val qty = workItems[type] ?: 0
+                        val selected = qty > 0
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            FilterChip(
+                                selected = selected,
+                                onClick = {
+                                    workItems = if (selected) workItems - type
+                                    else workItems + (type to 1)
+                                },
+                                label = { Text(type.label) },
+                                leadingIcon = {
+                                    Icon(
+                                        type.icon, contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            )
+                            if (selected) {
+                                Spacer(Modifier.weight(1f))
+                                IconButton(onClick = {
+                                    workItems = if (qty <= 1) workItems - type
+                                    else workItems + (type to qty - 1)
+                                }) { Icon(Icons.Default.Remove, contentDescription = "Меньше") }
+                                Text(
+                                    "$qty",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.widthIn(min = 22.dp)
                                 )
+                                IconButton(onClick = {
+                                    workItems = workItems + (type to qty + 1)
+                                }) { Icon(Icons.Default.Add, contentDescription = "Больше") }
+                            } else {
+                                Spacer(Modifier.weight(1f))
                             }
-                        )
+                        }
                     }
                 }
 
@@ -468,6 +535,31 @@ private fun OrderDialog(
                     Text("  " + (scheduled?.let { formatDateTime(it) } ?: "Дата выезда не задана"))
                 }
                 if (scheduled != null) {
+                    val date = Instant.ofEpochMilli(scheduled!!)
+                        .atZone(ZoneId.systemDefault()).toLocalDate()
+                    val others = allOrders.filter { it.id != (initial?.id ?: -1L) }
+                    val proposed = (initial ?: Order(clientName = "")).copy(
+                        scheduledMillis = scheduled,
+                        description = WorkType.join(workItems),
+                        status = OrderStatus.NEW.name
+                    )
+                    val load = computeDayLoad(others + proposed, date)
+                    Text(
+                        "Загрузка дня: ${formatHours(load.total)} ч • ${load.orderCount} заказов",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val conflict = findConflict(others, scheduled!!, totalDurationMs(workItems))
+                    if (conflict != null) {
+                        val conflictType = WorkType.parse(conflict.description)
+                            .entries.firstOrNull()?.key?.label ?: "заказ"
+                        Text(
+                            "⚠ Пересекается с заявкой «${conflict.clientName}» " +
+                                "($conflictType в ${formatTime(conflict.scheduledMillis!!)})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
                         Text("  Напомнить о заказе", style = MaterialTheme.typography.bodyMedium)
@@ -491,7 +583,7 @@ private fun OrderDialog(
                                 address = address.trim(),
                                 apartment = apartment.trim(),
                                 entrance = entrance.trim(),
-                                description = WorkType.join(workTypes),
+                                description = WorkType.join(workItems),
                                 price = price,
                                 status = status.name,
                                 scheduledMillis = scheduled,
