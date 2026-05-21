@@ -356,6 +356,14 @@ private fun OrderCard(
                         scope.launch {
                             val result = geocodeAddress(context, order.address)
                             if (result != null) {
+                                // Toast показывает, что именно нашёл геокодер,
+                                // чтобы при промахе сразу было видно, что
+                                // координаты ведут не туда.
+                                Toast.makeText(
+                                    context,
+                                    "Найдено [Я]: ${result.displayName}",
+                                    Toast.LENGTH_LONG
+                                ).show()
                                 openYandexDrivingRoute(
                                     context, result.latitude, result.longitude
                                 )

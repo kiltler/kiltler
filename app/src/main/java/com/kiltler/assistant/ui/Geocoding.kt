@@ -79,7 +79,16 @@ object KhabarovskRegion {
 suspend fun geocodeAddress(context: Context, query: String): GeocodeResult? {
     val trimmed = query.trim()
     if (trimmed.isBlank()) return null
-    val queries = listOf(qualifyAddress(trimmed), trimmed).distinct()
+    // Несколько форм одного запроса по убыванию приоритета.
+    // Префикс «улица»/«ул.» иногда сбивает фуззи-матчинг Яндекс Search SDK,
+    // поэтому пробуем и с ним, и без.
+    val withoutStreet = trimmed.replace(Regex("(?i)^\\s*(ул\\.?|улица)\\s+"), "")
+    val queries = listOf(
+        qualifyAddress(trimmed),
+        qualifyAddress(withoutStreet),
+        trimmed,
+        withoutStreet,
+    ).distinct()
 
     return withContext(Dispatchers.Main) {
         val manager = searchManager(context)
@@ -125,8 +134,12 @@ private fun searchManager(context: Context): SearchManager {
             SearchFactory.initialize(context.applicationContext)
             initialized = true
         }
+        // ONLINE даёт точные актуальные ответы по API Яндекса.
+        // COMBINED иногда выбирает offline-индекс с фуззи-матчингом, что и
+        // приводило к подмене на похоже звучащий, но географически далёкий
+        // адрес.
         return SearchFactory.getInstance()
-            .createSearchManager(SearchManagerType.COMBINED)
+            .createSearchManager(SearchManagerType.ONLINE)
             .also { cachedManager = it }
     }
 }
