@@ -60,6 +60,8 @@ fun AppScaffold() {
     val scope = rememberCoroutineScope()
 
     var tab by remember { mutableStateOf(Tab.SCHEDULE) }
+    var settings by remember { mutableStateOf(SettingsStore.load(context)) }
+    var showSettings by remember { mutableStateOf(false) }
     var dayFilter by remember {
         mutableStateOf<Long?>(
             Calendar.getInstance().apply {
@@ -142,6 +144,13 @@ fun AppScaffold() {
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text("Настройки") },
+                            onClick = {
+                                menuOpen = false
+                                showSettings = true
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Синхронизация") },
                             onClick = {
                                 menuOpen = false
@@ -190,6 +199,11 @@ fun AppScaffold() {
                     Tab.SCHEDULE -> ScheduleScreen(
                         reminders = reminders,
                         orders = orders,
+                        settings = settings,
+                        onSaveSettings = {
+                            settings = it
+                            SettingsStore.save(context, it)
+                        },
                         editing = editingReminder,
                         showDialog = showReminderDialog,
                         onDismissDialog = { showReminderDialog = false },
@@ -199,6 +213,7 @@ fun AppScaffold() {
                     )
                     Tab.ORDERS -> OrdersScreen(
                         orders = orders,
+                        settings = settings,
                         dayFilter = dayFilter,
                         onDayChange = { dayFilter = it },
                         onOpenDayMap = { tab = Tab.MAP },
@@ -220,6 +235,19 @@ fun AppScaffold() {
                 }
             }
         }
+
+    if (showSettings) {
+        SettingsDialog(
+            initial = settings,
+            onDismiss = { showSettings = false },
+            onSave = {
+                settings = it
+                SettingsStore.save(context, it)
+                showSettings = false
+                Toast.makeText(context, "Настройки сохранены", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
 
     if (showSyncDialog) {
         SyncDialog(

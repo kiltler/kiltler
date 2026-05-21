@@ -1,6 +1,5 @@
 package com.kiltler.assistant.ui.screens
 
-import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.ui.SectionHeader
 import com.kiltler.assistant.data.Order
+import com.kiltler.assistant.ui.AppSettings
 import com.kiltler.assistant.ui.VoiceTextField
 import com.kiltler.assistant.ui.formatDateTime
 import com.kiltler.assistant.ui.pickDateTime
@@ -52,6 +52,8 @@ import com.kiltler.assistant.ui.pickDateTime
 fun ScheduleScreen(
     reminders: List<Reminder>,
     orders: List<Order>,
+    settings: AppSettings,
+    onSaveSettings: (AppSettings) -> Unit,
     editing: Reminder?,
     showDialog: Boolean,
     onDismissDialog: () -> Unit,
@@ -59,10 +61,6 @@ fun ScheduleScreen(
     onToggleDone: (Reminder) -> Unit,
     onDelete: (Reminder) -> Unit
 ) {
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("finance", Context.MODE_PRIVATE) }
-    var matPct by remember { mutableStateOf(prefs.getInt("mat", 30)) }
-    var adsPct by remember { mutableStateOf(prefs.getInt("ads", 10)) }
     var showFinance by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(setOf<Long>()) }
     val toggleExpand: (Long) -> Unit = { id ->
@@ -79,8 +77,8 @@ fun ScheduleScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         FinanceCard(
             orders = orders,
-            matPct = matPct,
-            adsPct = adsPct,
+            matPct = settings.materialsPct,
+            adsPct = settings.adsPct,
             onClick = { showFinance = true },
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
         )
@@ -117,13 +115,11 @@ fun ScheduleScreen(
     if (showFinance) {
         FinanceDialog(
             orders = orders,
-            matPct = matPct,
-            adsPct = adsPct,
+            matPct = settings.materialsPct,
+            adsPct = settings.adsPct,
             onDismiss = { showFinance = false },
             onSave = { m, a ->
-                matPct = m
-                adsPct = a
-                prefs.edit().putInt("mat", m).putInt("ads", a).apply()
+                onSaveSettings(settings.copy(materialsPct = m, adsPct = a))
                 showFinance = false
             }
         )

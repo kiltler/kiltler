@@ -104,7 +104,6 @@ fun MapScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    var pendingPoint by remember { mutableStateOf<Point?>(null) }
     var selectedPlace by remember { mutableStateOf<WorkPlace?>(null) }
     var selectedOrder by remember { mutableStateOf<Order?>(null) }
     var voiceAddress by remember { mutableStateOf<String?>(null) }
@@ -151,9 +150,7 @@ fun MapScreen(
     val inputListener = remember {
         object : InputListener {
             override fun onMapTap(map: Map, point: Point) = Unit
-            override fun onMapLongTap(map: Map, point: Point) {
-                pendingPoint = point
-            }
+            override fun onMapLongTap(map: Map, point: Point) = Unit
         }
     }
     val routeListener = remember {
@@ -305,7 +302,7 @@ fun MapScreen(
         )
 
         Text(
-            "Удержите палец на карте или нажмите «Адрес голосом»",
+            "Заказы дня — нажмите на метку, чтобы открыть маршрут",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
@@ -372,17 +369,6 @@ fun MapScreen(
         }
     }
 
-    pendingPoint?.let { point ->
-        AddPlaceDialog(
-            point = point,
-            onDismiss = { pendingPoint = null },
-            onSave = { place ->
-                onSave(place)
-                pendingPoint = null
-            }
-        )
-    }
-
     selectedPlace?.let { place ->
         PlaceDetailsDialog(
             place = place,
@@ -440,52 +426,6 @@ private fun pinImageProvider(context: Context, resId: Int): ImageProvider {
     drawable.setBounds(0, 0, width, height)
     drawable.draw(canvas)
     return ImageProvider.fromBitmap(bitmap)
-}
-
-@Composable
-private fun AddPlaceDialog(
-    point: Point,
-    onDismiss: () -> Unit,
-    onSave: (WorkPlace) -> Unit
-) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Место работы") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Координаты: %.5f, %.5f".format(point.latitude, point.longitude),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                VoiceTextField(title, { title = it }, "Название / адрес", Modifier.fillMaxWidth())
-                VoiceTextField(
-                    description, { description = it }, "Заметка",
-                    Modifier.fillMaxWidth(), singleLine = false, minLines = 2
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (title.isNotBlank()) {
-                        onSave(
-                            WorkPlace(
-                                title = title.trim(),
-                                description = description.trim(),
-                                latitude = point.latitude,
-                                longitude = point.longitude
-                            )
-                        )
-                    }
-                }
-            ) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
-    )
 }
 
 /**

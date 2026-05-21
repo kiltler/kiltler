@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Plumbing
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import com.kiltler.assistant.data.Order
 import com.kiltler.assistant.data.OrderStatus
+import com.kiltler.assistant.ui.AppSettings
 import com.kiltler.assistant.ui.SectionHeader
 import com.kiltler.assistant.ui.StatusBadge
 import com.kiltler.assistant.ui.VoiceTextField
@@ -137,6 +139,7 @@ enum class WorkType(
 @Composable
 fun OrdersScreen(
     orders: List<Order>,
+    settings: AppSettings,
     dayFilter: Long?,
     onDayChange: (Long?) -> Unit,
     onOpenDayMap: () -> Unit,
@@ -148,23 +151,48 @@ fun OrdersScreen(
     onEdit: (Order) -> Unit
 ) {
     var filter by remember { mutableStateOf<OrderStatus?>(null) }
+    var query by remember { mutableStateOf("") }
     var showCalendar by remember { mutableStateOf(false) }
 
-    val dayFiltered = if (dayFilter == null) orders
-    else orders.filter { matchesDay(it.scheduledMillis, dayFilter!!) }
+    val q = query.trim().lowercase()
+    val matchesQuery: (Order) -> Boolean = { o ->
+        q.isBlank() ||
+            o.clientName.lowercase().contains(q) ||
+            o.phone.contains(q) ||
+            o.address.lowercase().contains(q) ||
+            o.apartment.lowercase().contains(q)
+    }
+
+    // При активном поиске фильтр по дню снимается, чтобы искать по всем заказам.
+    val effectiveDay = if (q.isBlank()) dayFilter else null
+    val dayFiltered = if (effectiveDay == null) orders
+    else orders.filter { matchesDay(it.scheduledMillis, effectiveDay) }
 
     val visible = dayFiltered
+        .filter(matchesQuery)
         .filter { o ->
             if (filter != null) o.status == filter!!.name
             else OrderStatus.from(o.status) != OrderStatus.DONE
         }
         .sortedWith(compareBy(nullsLast<Long>()) { it.scheduledMillis })
 
-    val allCount = dayFiltered.count { OrderStatus.from(it.status) != OrderStatus.DONE }
+    val allCount = dayFiltered
+        .filter(matchesQuery)
+        .count { OrderStatus.from(it.status) != OrderStatus.DONE }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text("Поиск: клиент, телефон, адрес") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        )
         Row(
-            modifier = Modifier.padding(start = 8.dp, end = 16.dp, top = 4.dp),
+            modifier = Modifier.padding(start = 8.dp, end = 16.dp, top = 0.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { showCalendar = true }) {
@@ -197,7 +225,7 @@ fun OrdersScreen(
                 )
             }
             items(OrderStatus.entries) { status ->
-                val count = dayFiltered.count { it.status == status.name }
+                val count = dayFiltered.filter(matchesQuery).count { it.status == status.name }
                 FilterChip(
                     selected = filter == status,
                     onClick = { filter = if (filter == status) null else status },
@@ -229,6 +257,7 @@ fun OrdersScreen(
         OrderDialog(
             initial = editing,
             allOrders = orders,
+            settings = settings,
             onDismiss = onDismissDialog,
             onSave = { onSave(it); onDismissDialog() }
         )
@@ -401,6 +430,7 @@ private fun InfoLine(icon: ImageVector, text: String) {
 private fun OrderDialog(
     initial: Order?,
     allOrders: List<Order>,
+    settings: AppSettings,
     onDismiss: () -> Unit,
     onSave: (Order) -> Unit
 ) {
@@ -424,7 +454,7 @@ private fun OrderDialog(
 
     // Авторасчёт суммы по выбранным работам, пока пользователь не правит сумму вручную.
     LaunchedEffect(workItems) {
-        val auto = workItems.entries.sumOf { (t, q) -> t.price * q }
+        val auto = workItems.entries.sumOf { (t, q) -> priceFor(t, settings) * q }
         val autoStr = if (auto > 0) formatMoney(auto) else ""
         if (priceText.isEmpty() || priceText == lastAuto) {
             priceText = autoStr
@@ -641,6 +671,13 @@ private fun formatPhone(input: String): String {
 
 private fun formatMoney(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+
+/** Цена за единицу работы с учётом пользовательских настроек. */
+private fun priceFor(type: WorkType, settings: AppSettings): Double = when (type) {
+    WorkType.CLEANING -> settings.cleaningPrice
+    WorkType.INSTALL -> settings.installPrice
+    else -> type.price
+}
 
 /** Полный адрес заказа: улица плюс квартира и подъезд, если заданы. */
 private fun fullAddress(order: Order): String = buildString {
