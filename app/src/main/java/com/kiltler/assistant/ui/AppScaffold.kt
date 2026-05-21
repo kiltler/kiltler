@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Schedule
@@ -39,11 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiltler.assistant.backup.BackupManager
-import com.kiltler.assistant.data.Material
 import com.kiltler.assistant.data.Order
 import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.ui.screens.MapScreen
-import com.kiltler.assistant.ui.screens.MaterialsScreen
 import com.kiltler.assistant.ui.screens.OrdersScreen
 import com.kiltler.assistant.ui.screens.ScheduleScreen
 import kotlinx.coroutines.launch
@@ -51,7 +48,6 @@ import kotlinx.coroutines.launch
 private enum class Tab(val title: String, val icon: ImageVector) {
     SCHEDULE("Расписание", Icons.Default.Schedule),
     ORDERS("Заказы", Icons.AutoMirrored.Filled.List),
-    MATERIALS("Материалы", Icons.Default.Inventory2),
     MAP("Карта", Icons.Default.Map)
 }
 
@@ -69,13 +65,10 @@ fun AppScaffold() {
     var editingReminder by remember { mutableStateOf<Reminder?>(null) }
     var showOrderDialog by remember { mutableStateOf(false) }
     var editingOrder by remember { mutableStateOf<Order?>(null) }
-    var showMaterialDialog by remember { mutableStateOf(false) }
-    var editingMaterial by remember { mutableStateOf<Material?>(null) }
     var showSyncDialog by remember { mutableStateOf(false) }
 
     val reminders by vm.reminders.collectAsStateWithLifecycle()
     val orders by vm.orders.collectAsStateWithLifecycle()
-    val materials by vm.materials.collectAsStateWithLifecycle()
     val workPlaces by vm.workPlaces.collectAsStateWithLifecycle()
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -138,18 +131,6 @@ fun AppScaffold() {
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Расходники: сплит-система") },
-                            onClick = {
-                                menuOpen = false
-                                vm.addSplitSystemMaterials()
-                                Toast.makeText(
-                                    context,
-                                    "Расходники добавлены в «Материалы»",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        )
-                        DropdownMenuItem(
                             text = { Text("Синхронизация") },
                             onClick = {
                                 menuOpen = false
@@ -185,7 +166,6 @@ fun AppScaffold() {
                     when (tab) {
                         Tab.SCHEDULE -> { editingReminder = null; showReminderDialog = true }
                         Tab.ORDERS -> { editingOrder = null; showOrderDialog = true }
-                        Tab.MATERIALS -> { editingMaterial = null; showMaterialDialog = true }
                         Tab.MAP -> {}
                     }
                 }) {
@@ -214,16 +194,6 @@ fun AppScaffold() {
                         onSave = vm::saveOrder,
                         onDelete = vm::deleteOrder,
                         onEdit = { editingOrder = it; showOrderDialog = true }
-                    )
-                    Tab.MATERIALS -> MaterialsScreen(
-                        materials = materials,
-                        editing = editingMaterial,
-                        showDialog = showMaterialDialog,
-                        onDismissDialog = { showMaterialDialog = false },
-                        onSave = vm::saveMaterial,
-                        onDelete = vm::deleteMaterial,
-                        onEdit = { editingMaterial = it; showMaterialDialog = true },
-                        onAdjust = vm::adjustMaterial
                     )
                     Tab.MAP -> MapScreen(
                         workPlaces = workPlaces,
