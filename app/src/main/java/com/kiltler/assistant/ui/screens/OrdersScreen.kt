@@ -530,7 +530,7 @@ private fun fullAddress(order: Order): String = buildString {
     if (order.entrance.isNotBlank()) append(", подъезд ${order.entrance}")
 }
 
-internal fun startOfToday(): Long {
+private fun startOfToday(): Long {
     val c = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
         set(Calendar.MINUTE, 0)
@@ -540,7 +540,7 @@ internal fun startOfToday(): Long {
     return c.timeInMillis
 }
 
-internal fun matchesDay(scheduledMillis: Long?, dayStart: Long): Boolean {
+private fun matchesDay(scheduledMillis: Long?, dayStart: Long): Boolean {
     if (scheduledMillis == null) return false
     val dayEnd = dayStart + 24L * 60 * 60 * 1000
     return scheduledMillis in dayStart until dayEnd
