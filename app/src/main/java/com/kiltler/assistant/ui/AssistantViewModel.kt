@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.kiltler.assistant.backup.BackupData
 import com.kiltler.assistant.backup.BackupManager
 import com.kiltler.assistant.data.AppDatabase
+import com.kiltler.assistant.data.Expense
 import com.kiltler.assistant.data.Material
 import com.kiltler.assistant.data.Order
 import com.kiltler.assistant.data.OrderStatus
@@ -49,6 +50,8 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
         repo.materials.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val workPlaces: StateFlow<List<WorkPlace>> =
         repo.workPlaces.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val expenses: StateFlow<List<Expense>> =
+        repo.expenses.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- Напоминания ---
     fun saveReminder(reminder: Reminder) = viewModelScope.launch {
@@ -139,18 +142,32 @@ class AssistantViewModel(app: Application) : AndroidViewModel(app) {
         pushSync()
     }
 
+    // --- Расходы ---
+    fun saveExpense(expense: Expense) = viewModelScope.launch {
+        repo.upsertExpense(expense)
+        pushSync()
+    }
+
+    fun deleteExpense(expense: Expense) = viewModelScope.launch {
+        repo.deleteExpense(expense)
+        pushSync()
+    }
+
     // --- Бэкап ---
     suspend fun buildBackup(): BackupData = BackupData(
         reminders = repo.allReminders(),
         orders = repo.allOrders(),
         materials = repo.allMaterials(),
-        workPlaces = repo.allWorkPlaces()
+        workPlaces = repo.allWorkPlaces(),
+        expenses = repo.allExpenses()
     )
 
     fun importBackup(json: String, onResult: (Boolean, String) -> Unit) = viewModelScope.launch {
         try {
             val data = BackupManager.fromJson(json)
-            repo.replaceAll(data.reminders, data.orders, data.materials, data.workPlaces)
+            repo.replaceAll(
+                data.reminders, data.orders, data.materials, data.workPlaces, data.expenses
+            )
             data.reminders.filter { !it.isDone }.forEach {
                 ReminderScheduler.schedule(
                     ctx, ReminderScheduler.reminderRequestCode(it.id),

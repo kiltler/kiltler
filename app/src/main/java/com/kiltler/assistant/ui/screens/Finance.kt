@@ -19,6 +19,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.kiltler.assistant.data.Expense
 import com.kiltler.assistant.data.Order
 import com.kiltler.assistant.data.OrderStatus
 import com.kiltler.assistant.ui.AppSettings
@@ -44,11 +46,13 @@ data class FinanceStats(
     val revenue: Double,
     val materials: Double,
     val ads: Double,
+    val expenses: Double,
     val net: Double
 )
 
 private fun computeFinance(
     orders: List<Order>,
+    expenses: List<Expense>,
     sinceMillis: Long?,
     settings: AppSettings
 ): FinanceStats {
@@ -60,9 +64,13 @@ private fun computeFinance(
             val acBase = if (saleQty > 0) settings.acPriceFor(o.acModel) * saleQty else 0.0
             (o.price - acBase).coerceAtLeast(0.0)
         }
+    val expensesSum = expenses
+        .filter { sinceMillis == null || it.createdAtMillis >= sinceMillis }
+        .sumOf { it.amount }
     val materials = revenue * settings.materialsPct / 100.0
     val ads = revenue * settings.adsPct / 100.0
-    return FinanceStats(revenue, materials, ads, revenue - materials - ads)
+    val net = revenue - materials - ads - expensesSum
+    return FinanceStats(revenue, materials, ads, expensesSum, net)
 }
 
 private fun startOfToday(): Long {
@@ -81,13 +89,14 @@ private fun money(value: Double): String =
 @Composable
 fun FinanceCard(
     orders: List<Order>,
+    expenses: List<Expense>,
     settings: AppSettings,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val all = computeFinance(orders, null, settings)
-    val day = computeFinance(orders, startOfToday(), settings)
-    val week = computeFinance(orders, System.currentTimeMillis() - WEEK_MS, settings)
+    val all = computeFinance(orders, expenses, null, settings)
+    val day = computeFinance(orders, expenses, startOfToday(), settings)
+    val week = computeFinance(orders, expenses, System.currentTimeMillis() - WEEK_MS, settings)
 
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -137,9 +146,11 @@ private fun FinanceMini(label: String, value: Double, modifier: Modifier) {
 @Composable
 fun FinanceDialog(
     orders: List<Order>,
+    expenses: List<Expense>,
     settings: AppSettings,
     onDismiss: () -> Unit,
-    onSave: (Int, Int) -> Unit
+    onSave: (Int, Int) -> Unit,
+    onOpenExpenses: () -> Unit
 ) {
     var mat by remember { mutableStateOf(settings.materialsPct.toString()) }
     var ads by remember { mutableStateOf(settings.adsPct.toString()) }
@@ -155,14 +166,26 @@ fun FinanceDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                FinanceSection("Сегодня", computeFinance(orders, startOfToday(), effective))
+                FinanceSection(
+                    "Сегодня",
+                    computeFinance(orders, expenses, startOfToday(), effective),
+                    showSalary = true
+                )
                 FinanceSection(
                     "За неделю",
-                    computeFinance(orders, System.currentTimeMillis() - WEEK_MS, effective)
+                    computeFinance(orders, expenses, System.currentTimeMillis() - WEEK_MS, effective)
                 )
-                FinanceSection("За всё время", computeFinance(orders, null, effective))
+                FinanceSection(
+                    "За всё время",
+                    computeFinance(orders, expenses, null, effective)
+                )
 
                 HorizontalDivider()
+                OutlinedButton(
+                    onClick = onOpenExpenses,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Управлять расходами") }
+
                 Text(
                     "Отчисления (% от выручки)",
                     style = MaterialTheme.typography.labelLarge,
@@ -187,7 +210,7 @@ fun FinanceDialog(
                     )
                 }
                 Text(
-                    "Считается по выполненным заказам.",
+                    "Считается по выполненным заказам. Зарплата = чистая прибыль / 2.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -203,7 +226,11 @@ fun FinanceDialog(
 }
 
 @Composable
-private fun FinanceSection(title: String, stats: FinanceStats) {
+private fun FinanceSection(
+    title: String,
+    stats: FinanceStats,
+    showSalary: Boolean = false
+) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             title,
@@ -214,7 +241,13 @@ private fun FinanceSection(title: String, stats: FinanceStats) {
         FinanceRow("Выручка", money(stats.revenue))
         FinanceRow("На материалы", "− ${money(stats.materials)}")
         FinanceRow("На рекламу", "− ${money(stats.ads)}")
+        if (stats.expenses > 0) {
+            FinanceRow("Расходы", "− ${money(stats.expenses)}")
+        }
         FinanceRow("Чистая прибыль", money(stats.net), highlight = true)
+        if (showSalary && stats.net > 0) {
+            FinanceRow("Зарплата (на одного)", money(stats.net / 2.0), highlight = true)
+        }
     }
 }
 

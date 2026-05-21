@@ -9,11 +9,13 @@ class Repository(db: AppDatabase) {
     private val orderDao = db.orderDao()
     private val materialDao = db.materialDao()
     private val workPlaceDao = db.workPlaceDao()
+    private val expenseDao = db.expenseDao()
 
     val reminders: Flow<List<Reminder>> = reminderDao.observeAll()
     val orders: Flow<List<Order>> = orderDao.observeAll()
     val materials: Flow<List<Material>> = materialDao.observeAll()
     val workPlaces: Flow<List<WorkPlace>> = workPlaceDao.observeAll()
+    val expenses: Flow<List<Expense>> = expenseDao.observeAll()
 
     // --- Напоминания ---
     suspend fun upsertReminder(r: Reminder): Long = reminderDao.upsert(r)
@@ -35,17 +37,25 @@ class Repository(db: AppDatabase) {
     suspend fun deleteWorkPlace(p: WorkPlace) = workPlaceDao.delete(p)
     suspend fun allWorkPlaces(): List<WorkPlace> = workPlaceDao.getAll()
 
+    // --- Расходы ---
+    suspend fun upsertExpense(e: Expense): Long = expenseDao.upsert(e)
+    suspend fun deleteExpense(e: Expense) = expenseDao.delete(e)
+    suspend fun allExpenses(): List<Expense> = expenseDao.getAll()
+
     /** Полная замена данных при импорте бэкапа. */
     suspend fun replaceAll(
         reminders: List<Reminder>,
         orders: List<Order>,
         materials: List<Material>,
-        workPlaces: List<WorkPlace>
+        workPlaces: List<WorkPlace>,
+        expenses: List<Expense>
     ) {
-        reminderDao.clear(); orderDao.clear(); materialDao.clear(); workPlaceDao.clear()
+        reminderDao.clear(); orderDao.clear(); materialDao.clear()
+        workPlaceDao.clear(); expenseDao.clear()
         reminderDao.insertAll(reminders)
         orderDao.insertAll(orders)
         materialDao.insertAll(materials)
         workPlaceDao.insertAll(workPlaces)
+        expenseDao.insertAll(expenses)
     }
 }

@@ -49,6 +49,15 @@ data class Material(
     val isLow: Boolean get() = quantity <= minQuantity
 }
 
+/** Расход за день: вычитается из выручки при расчёте чистой прибыли. */
+@Entity(tableName = "expenses")
+data class Expense(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val amount: Double,
+    val note: String = "",
+    val createdAtMillis: Long = System.currentTimeMillis()
+)
+
 /** Точка на карте — место работы. */
 @Entity(tableName = "workplaces")
 data class WorkPlace(

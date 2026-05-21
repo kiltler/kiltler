@@ -72,6 +72,27 @@ interface MaterialDao {
 }
 
 @Dao
+interface ExpenseDao {
+    @Query("SELECT * FROM expenses ORDER BY createdAtMillis DESC")
+    fun observeAll(): Flow<List<Expense>>
+
+    @Query("SELECT * FROM expenses")
+    suspend fun getAll(): List<Expense>
+
+    @Upsert
+    suspend fun upsert(expense: Expense): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(expenses: List<Expense>)
+
+    @Delete
+    suspend fun delete(expense: Expense)
+
+    @Query("DELETE FROM expenses")
+    suspend fun clear()
+}
+
+@Dao
 interface WorkPlaceDao {
     @Query("SELECT * FROM workplaces ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<WorkPlace>>

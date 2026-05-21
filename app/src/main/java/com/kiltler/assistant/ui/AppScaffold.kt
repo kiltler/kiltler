@@ -40,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiltler.assistant.backup.BackupManager
 import com.kiltler.assistant.data.Order
 import com.kiltler.assistant.data.Reminder
+import com.kiltler.assistant.ui.screens.ExpensesDialog
 import com.kiltler.assistant.ui.screens.MapScreen
 import com.kiltler.assistant.ui.screens.OrdersScreen
 import com.kiltler.assistant.ui.screens.ScheduleScreen
@@ -47,7 +48,7 @@ import java.util.Calendar
 import kotlinx.coroutines.launch
 
 private enum class Tab(val title: String, val icon: ImageVector) {
-    SCHEDULE("Расписание", Icons.Default.Schedule),
+    SCHEDULE("Заметки", Icons.Default.Schedule),
     ORDERS("Заказы", Icons.AutoMirrored.Filled.List),
     MAP("Карта", Icons.Default.Map)
 }
@@ -79,10 +80,12 @@ fun AppScaffold() {
     var showOrderDialog by remember { mutableStateOf(false) }
     var editingOrder by remember { mutableStateOf<Order?>(null) }
     var showSyncDialog by remember { mutableStateOf(false) }
+    var showExpenses by remember { mutableStateOf(false) }
 
     val reminders by vm.reminders.collectAsStateWithLifecycle()
     val orders by vm.orders.collectAsStateWithLifecycle()
     val workPlaces by vm.workPlaces.collectAsStateWithLifecycle()
+    val expenses by vm.expenses.collectAsStateWithLifecycle()
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -144,6 +147,13 @@ fun AppScaffold() {
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text("Расходы") },
+                            onClick = {
+                                menuOpen = false
+                                showExpenses = true
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Настройки") },
                             onClick = {
                                 menuOpen = false
@@ -199,11 +209,13 @@ fun AppScaffold() {
                     Tab.SCHEDULE -> ScheduleScreen(
                         reminders = reminders,
                         orders = orders,
+                        expenses = expenses,
                         settings = settings,
                         onSaveSettings = {
                             settings = it
                             SettingsStore.save(context, it)
                         },
+                        onOpenExpenses = { showExpenses = true },
                         editing = editingReminder,
                         showDialog = showReminderDialog,
                         onDismissDialog = { showReminderDialog = false },
@@ -235,6 +247,19 @@ fun AppScaffold() {
                 }
             }
         }
+
+    if (showExpenses) {
+        ExpensesDialog(
+            expenses = expenses,
+            onAdd = { amount, note ->
+                vm.saveExpense(
+                    com.kiltler.assistant.data.Expense(amount = amount, note = note)
+                )
+            },
+            onDelete = vm::deleteExpense,
+            onDismiss = { showExpenses = false }
+        )
+    }
 
     if (showSettings) {
         SettingsDialog(

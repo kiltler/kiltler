@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kiltler.assistant.data.Reminder
 import com.kiltler.assistant.ui.SectionHeader
+import com.kiltler.assistant.data.Expense
 import com.kiltler.assistant.data.Order
 import com.kiltler.assistant.ui.AppSettings
 import com.kiltler.assistant.ui.VoiceTextField
@@ -52,8 +53,10 @@ import com.kiltler.assistant.ui.pickDateTime
 fun ScheduleScreen(
     reminders: List<Reminder>,
     orders: List<Order>,
+    expenses: List<Expense>,
     settings: AppSettings,
     onSaveSettings: (AppSettings) -> Unit,
+    onOpenExpenses: () -> Unit,
     editing: Reminder?,
     showDialog: Boolean,
     onDismissDialog: () -> Unit,
@@ -77,6 +80,7 @@ fun ScheduleScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         FinanceCard(
             orders = orders,
+            expenses = expenses,
             settings = settings,
             onClick = { showFinance = true },
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
@@ -85,8 +89,8 @@ fun ScheduleScreen(
             Box(modifier = Modifier.weight(1f)) {
                 EmptyState(
                     Icons.Default.Schedule,
-                    "Пока нет напоминаний",
-                    "Нажмите +, чтобы добавить первое"
+                    "Пока нет заметок",
+                    "Нажмите +, чтобы добавить первую"
                 )
             }
         } else {
@@ -114,11 +118,16 @@ fun ScheduleScreen(
     if (showFinance) {
         FinanceDialog(
             orders = orders,
+            expenses = expenses,
             settings = settings,
             onDismiss = { showFinance = false },
             onSave = { m, a ->
                 onSaveSettings(settings.copy(materialsPct = m, adsPct = a))
                 showFinance = false
+            },
+            onOpenExpenses = {
+                showFinance = false
+                onOpenExpenses()
             }
         )
     }
@@ -218,7 +227,7 @@ private fun ReminderDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Новое напоминание" else "Напоминание") },
+        title = { Text(if (initial == null) "Новая заметка" else "Заметка") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 VoiceTextField(title, { title = it }, "Название", Modifier.fillMaxWidth())
