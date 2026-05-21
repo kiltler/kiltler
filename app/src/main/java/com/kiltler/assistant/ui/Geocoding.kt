@@ -120,20 +120,16 @@ fun qualifyAddress(query: String): String {
 // --- Yandex Search SDK ---
 
 @Volatile
-private var initialized = false
-
-@Volatile
 private var cachedManager: SearchManager? = null
 
-/** Лениво инициализирует Search SDK на главном потоке и кэширует менеджер. */
-private fun searchManager(context: Context): SearchManager {
+/** Лениво создаёт менеджер поиска на главном потоке и кэширует его.
+ *  В MapKit 4.x Search SDK инициализируется автоматически вместе с
+ *  `MapKitFactory.initialize(...)` (вызывается в MainActivity), отдельный
+ *  `SearchFactory.initialize(...)` в этой версии SDK отсутствует. */
+private fun searchManager(@Suppress("UNUSED_PARAMETER") context: Context): SearchManager {
     cachedManager?.let { return it }
     synchronized(Geocoding) {
         cachedManager?.let { return it }
-        if (!initialized) {
-            SearchFactory.initialize(context.applicationContext)
-            initialized = true
-        }
         // ONLINE даёт точные актуальные ответы по API Яндекса.
         // COMBINED иногда выбирает offline-индекс с фуззи-матчингом, что и
         // приводило к подмене на похоже звучащий, но географически далёкий
