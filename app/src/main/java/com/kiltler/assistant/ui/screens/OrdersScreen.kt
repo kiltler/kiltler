@@ -76,6 +76,7 @@ import com.kiltler.assistant.ui.formatTime
 import com.kiltler.assistant.ui.geocodeAddress
 import com.kiltler.assistant.ui.openYandexDrivingRoute
 import com.kiltler.assistant.ui.pickDateTime
+import com.kiltler.assistant.ui.pickTime
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -413,6 +414,7 @@ private fun OrderDialog(
     var status by remember { mutableStateOf(OrderStatus.from(initial?.status ?: OrderStatus.NEW.name)) }
     var scheduled by remember { mutableStateOf(initial?.scheduledMillis) }
     var reminderEnabled by remember { mutableStateOf(initial?.reminderEnabled ?: true) }
+    var pickingDate by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
 
     // Авторасчёт суммы по выбранным работам, пока пользователь не правит сумму вручную.
@@ -524,11 +526,7 @@ private fun OrderDialog(
                 }
 
                 OutlinedButton(
-                    onClick = {
-                        pickDateTime(context, scheduled ?: System.currentTimeMillis()) {
-                            scheduled = it
-                        }
-                    },
+                    onClick = { pickingDate = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Schedule, contentDescription = null)
@@ -596,6 +594,32 @@ private fun OrderDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
+
+    if (pickingDate) {
+        OrdersCalendarDialog(
+            orders = allOrders.filter { it.id != (initial?.id ?: -1L) },
+            selectedDay = scheduled ?: System.currentTimeMillis(),
+            title = "Выбор даты выезда",
+            confirmLabel = "Выбрать",
+            onSelect = { dayMs ->
+                pickingDate = false
+                val previous = Calendar.getInstance().apply {
+                    timeInMillis = scheduled ?: System.currentTimeMillis()
+                }
+                val target = Calendar.getInstance().apply {
+                    timeInMillis = dayMs
+                    set(Calendar.HOUR_OF_DAY, previous.get(Calendar.HOUR_OF_DAY))
+                    set(Calendar.MINUTE, previous.get(Calendar.MINUTE))
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                pickTime(context, target.timeInMillis) { picked ->
+                    scheduled = picked
+                }
+            },
+            onDismiss = { pickingDate = false }
+        )
+    }
 }
 
 private fun Modifier.androidVerticalScroll(state: androidx.compose.foundation.ScrollState): Modifier =

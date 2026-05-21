@@ -129,6 +129,24 @@ fun StatusBadge(text: String, color: Color, modifier: Modifier = Modifier) {
     }
 }
 
+/** Платформенный выбор только времени — возвращает обновлённый момент в миллисекундах. */
+fun pickTime(context: Context, initialMillis: Long, onPicked: (Long) -> Unit) {
+    val cal = Calendar.getInstance().apply { timeInMillis = initialMillis }
+    TimePickerDialog(
+        context,
+        { _, hour, minute ->
+            cal.set(Calendar.HOUR_OF_DAY, hour)
+            cal.set(Calendar.MINUTE, minute)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            onPicked(cal.timeInMillis)
+        },
+        cal.get(Calendar.HOUR_OF_DAY),
+        cal.get(Calendar.MINUTE),
+        true
+    ).show()
+}
+
 /** Платформенный выбор даты, затем времени — единый момент в миллисекундах. */
 fun pickDateTime(context: Context, initialMillis: Long, onPicked: (Long) -> Unit) {
     val cal = Calendar.getInstance().apply { timeInMillis = initialMillis }

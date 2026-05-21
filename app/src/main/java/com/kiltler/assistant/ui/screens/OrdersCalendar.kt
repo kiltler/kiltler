@@ -114,7 +114,9 @@ fun OrdersCalendarDialog(
     orders: List<Order>,
     selectedDay: Long,
     onSelect: (Long) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    title: String = "Календарь загрузки",
+    confirmLabel: String = "Показать этот день"
 ) {
     val today = LocalDate.now()
     val zone = ZoneId.systemDefault()
@@ -124,7 +126,7 @@ fun OrdersCalendarDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Календарь загрузки") },
+        title = { Text(title) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -150,7 +152,7 @@ fun OrdersCalendarDialog(
         confirmButton = {
             TextButton(onClick = {
                 onSelect(pickedDate.atStartOfDay(zone).toInstant().toEpochMilli())
-            }) { Text("Показать этот день") }
+            }) { Text(confirmLabel) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Закрыть") }
@@ -273,16 +275,17 @@ private fun DayCell(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Legend() {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        LegendDot(Color(0xFFC8E6C9), "Свободно")
-        LegendDot(Color(0xFFFFE082), "Средне")
-        LegendDot(Color(0xFFFFAB91), "Плотно")
-        LegendDot(Color(0xFFEF5350), "Перегруз")
+        LegendDot(loadColor(LoadLevel.LOW), "Свободно")
+        LegendDot(loadColor(LoadLevel.MEDIUM), "Средне")
+        LegendDot(loadColor(LoadLevel.HIGH), "Плотно")
+        LegendDot(loadColor(LoadLevel.OVERLOAD), "Критично")
     }
 }
 
