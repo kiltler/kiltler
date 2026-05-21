@@ -353,38 +353,17 @@ private fun OrderCard(
             if (order.address.isNotBlank()) {
                 FilledTonalButton(
                     onClick = {
-                        // Сразу даём пользователю обратную связь, чтобы было видно,
-                        // что новая сборка реально запустилась и нажатие сработало.
-                        Toast.makeText(
-                            context,
-                            "Запрос к Яндексу: ${order.address}",
-                            Toast.LENGTH_SHORT
-                        ).show()
                         scope.launch {
-                            try {
-                                val result = geocodeAddress(context, order.address)
-                                if (result != null) {
-                                    Toast.makeText(
-                                        context,
-                                        "Найдено [Я]: ${result.displayName}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    openYandexDrivingRoute(
-                                        context, result.latitude, result.longitude
-                                    )
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Адрес не найден — уточните адрес заказа",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            } catch (t: Throwable) {
-                                // Любое падение Яндекс SDK видим в UI вместо тишины.
+                            val result = geocodeAddress(context, order.address)
+                            if (result != null) {
+                                openYandexDrivingRoute(
+                                    context, result.latitude, result.longitude
+                                )
+                            } else {
                                 Toast.makeText(
                                     context,
-                                    "Ошибка геокодера: ${t.javaClass.simpleName}: ${t.message}",
-                                    Toast.LENGTH_LONG
+                                    "Адрес не найден — уточните адрес заказа",
+                                    Toast.LENGTH_SHORT
                                 ).show()
                             }
                         }
