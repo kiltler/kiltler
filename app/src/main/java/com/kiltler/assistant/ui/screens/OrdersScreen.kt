@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Colorize
@@ -69,14 +70,25 @@ import com.kiltler.assistant.ui.geocodeAddress
 import com.kiltler.assistant.ui.openYandexDrivingRoute
 import com.kiltler.assistant.ui.pickDateTime
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /** Виды работ по заказу — можно выбрать несколько одновременно. */
-enum class WorkType(val label: String, val icon: ImageVector) {
-    CLEANING("Чистка", Icons.Default.CleaningServices),
-    REFILL("Заправка", Icons.Default.Colorize),
-    INSTALL("Установка", Icons.Default.Build),
-    PRE_INSTALL("Закладка", Icons.Default.Plumbing),
-    SALE("Продажа", Icons.Default.Sell);
+enum class WorkType(
+    val label: String,
+    val icon: ImageVector,
+    /** Среднее время на работу в часах — используется для расчёта загрузки дня. */
+    val hours: Double,
+    /** true — шумные работы (нельзя в «тихий час» 13:00–15:00). */
+    val noisy: Boolean
+) {
+    CLEANING("Чистка", Icons.Default.CleaningServices, 1.0, false),
+    REFILL("Заправка", Icons.Default.Colorize, 0.5, false),
+    INSTALL("Установка", Icons.Default.Build, 2.0, true),
+    PRE_INSTALL("Закладка", Icons.Default.Plumbing, 2.5, true),
+    SALE("Продажа", Icons.Default.Sell, 0.0, false);
 
     companion object {
         /** Разбирает поле описания заказа в список выбранных видов работ. */
@@ -102,24 +114,54 @@ fun OrdersScreen(
     onEdit: (Order) -> Unit
 ) {
     var filter by remember { mutableStateOf<OrderStatus?>(null) }
-    val visible = orders
-        .filter { filter == null || it.status == filter!!.name }
+    var dayFilter by remember { mutableStateOf<Long?>(startOfToday()) }
+    var showCalendar by remember { mutableStateOf(false) }
+
+    val dayFiltered = if (dayFilter == null) orders
+    else orders.filter { matchesDay(it.scheduledMillis, dayFilter!!) }
+
+    val visible = dayFiltered
+        .filter { o ->
+            if (filter != null) o.status == filter!!.name
+            else OrderStatus.from(o.status) != OrderStatus.DONE
+        }
         .sortedWith(compareBy(nullsLast<Long>()) { it.scheduledMillis })
 
+    val allCount = dayFiltered.count { OrderStatus.from(it.status) != OrderStatus.DONE }
+
     Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.padding(start = 8.dp, end = 16.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { showCalendar = true }) {
+                Icon(Icons.Default.CalendarMonth, contentDescription = "Календарь загрузки")
+            }
+            Text(
+                dayFilter?.let { dayLabel(it) } ?: "Все дни",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            if (dayFilter != null) {
+                TextButton(onClick = { dayFilter = null }) { Text("Все дни") }
+            } else {
+                TextButton(onClick = { dayFilter = startOfToday() }) { Text("Сегодня") }
+            }
+        }
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
                 FilterChip(
                     selected = filter == null,
                     onClick = { filter = null },
-                    label = { Text("Все (${orders.size})") }
+                    label = { Text("Все ($allCount)") }
                 )
             }
             items(OrderStatus.entries) { status ->
-                val count = orders.count { it.status == status.name }
+                val count = dayFiltered.count { it.status == status.name }
                 FilterChip(
                     selected = filter == status,
                     onClick = { filter = if (filter == status) null else status },
@@ -152,6 +194,15 @@ fun OrdersScreen(
             initial = editing,
             onDismiss = onDismissDialog,
             onSave = { onSave(it); onDismissDialog() }
+        )
+    }
+
+    if (showCalendar) {
+        OrdersCalendarDialog(
+            orders = orders,
+            selectedDay = dayFilter ?: startOfToday(),
+            onSelect = { dayFilter = it; showCalendar = false },
+            onDismiss = { showCalendar = false }
         )
     }
 }
@@ -477,4 +528,31 @@ private fun fullAddress(order: Order): String = buildString {
     append(order.address)
     if (order.apartment.isNotBlank()) append(", кв. ${order.apartment}")
     if (order.entrance.isNotBlank()) append(", подъезд ${order.entrance}")
+}
+
+internal fun startOfToday(): Long {
+    val c = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    return c.timeInMillis
+}
+
+internal fun matchesDay(scheduledMillis: Long?, dayStart: Long): Boolean {
+    if (scheduledMillis == null) return false
+    val dayEnd = dayStart + 24L * 60 * 60 * 1000
+    return scheduledMillis in dayStart until dayEnd
+}
+
+private val dayLabelFmt = SimpleDateFormat("d MMMM", Locale("ru"))
+
+private fun dayLabel(dayStart: Long): String {
+    val now = Calendar.getInstance()
+    val day = Calendar.getInstance().apply { timeInMillis = dayStart }
+    val isToday = now.get(Calendar.YEAR) == day.get(Calendar.YEAR) &&
+        now.get(Calendar.DAY_OF_YEAR) == day.get(Calendar.DAY_OF_YEAR)
+    val date = dayLabelFmt.format(Date(dayStart))
+    return if (isToday) "Сегодня, $date" else date
 }

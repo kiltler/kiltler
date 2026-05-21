@@ -1,6 +1,7 @@
 package com.kiltler.assistant.ui.screens
 
 import android.content.Context
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +64,10 @@ fun ScheduleScreen(
     var matPct by remember { mutableStateOf(prefs.getInt("mat", 30)) }
     var adsPct by remember { mutableStateOf(prefs.getInt("ads", 10)) }
     var showFinance by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(setOf<Long>()) }
+    val toggleExpand: (Long) -> Unit = { id ->
+        expanded = if (id in expanded) expanded - id else expanded + id
+    }
 
     val now = System.currentTimeMillis()
     val active = reminders.filter { !it.isDone }
@@ -93,10 +98,10 @@ fun ScheduleScreen(
                 contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                section("Просрочено", overdue, onToggleDone, onDelete, accent = true)
-                section("Сегодня", today, onToggleDone, onDelete)
-                section("Предстоящие", upcoming, onToggleDone, onDelete)
-                section("Выполнено", done, onToggleDone, onDelete)
+                section("Просрочено", overdue, expanded, toggleExpand, onToggleDone, onDelete, accent = true)
+                section("Сегодня", today, expanded, toggleExpand, onToggleDone, onDelete)
+                section("Предстоящие", upcoming, expanded, toggleExpand, onToggleDone, onDelete)
+                section("Выполнено", done, expanded, toggleExpand, onToggleDone, onDelete)
             }
         }
     }
@@ -128,6 +133,8 @@ fun ScheduleScreen(
 private fun androidx.compose.foundation.lazy.LazyListScope.section(
     title: String,
     data: List<Reminder>,
+    expanded: Set<Long>,
+    onToggleExpand: (Long) -> Unit,
     onToggleDone: (Reminder) -> Unit,
     onDelete: (Reminder) -> Unit,
     accent: Boolean = false
@@ -135,7 +142,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
     if (data.isEmpty()) return
     item(key = "header_$title") { SectionHeader(title) }
     items(data, key = { it.id }) { reminder ->
-        ReminderRow(reminder, accent, onToggleDone, onDelete)
+        ReminderRow(
+            reminder = reminder,
+            accent = accent,
+            isExpanded = reminder.id in expanded,
+            onToggleExpand = { onToggleExpand(reminder.id) },
+            onToggleDone = onToggleDone,
+            onDelete = onDelete
+        )
     }
 }
 
@@ -143,6 +157,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
 private fun ReminderRow(
     reminder: Reminder,
     accent: Boolean,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
     onToggleDone: (Reminder) -> Unit,
     onDelete: (Reminder) -> Unit
 ) {
@@ -158,12 +174,17 @@ private fun ReminderRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(checked = reminder.isDone, onCheckedChange = { onToggleDone(reminder) })
-            Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 10.dp)
+                    .clickable(onClick = onToggleExpand)
+            ) {
                 Text(
                     reminder.title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    maxLines = 1,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else 1,
                     overflow = TextOverflow.Ellipsis,
                     textDecoration = if (reminder.isDone) TextDecoration.LineThrough else null
                 )
@@ -178,7 +199,7 @@ private fun ReminderRow(
                         reminder.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = if (isExpanded) Int.MAX_VALUE else 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
