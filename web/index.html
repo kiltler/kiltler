@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ассистент — веб-редактор</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --border: #d9dce1;
+    --text: #1a1d21;
+    --muted: #6b7280;
+    --accent: #1f6feb;
+    --accent-text: #ffffff;
+    --danger: #c0392b;
+    --ok: #2e9e5b;
+    --warn: #e08a1f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; margin: 0; flex: 0 0 auto; }
+  header .spacer { flex: 1; }
+  .field { display: flex; align-items: center; gap: 6px; }
+  .field label { color: var(--muted); font-size: 12px; }
+  input, select, textarea {
+    font: inherit;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--text);
+  }
+  input[type="number"] { width: 110px; }
+  input[type="datetime-local"] { width: 200px; }
+  input.code { width: 160px; font-family: ui-monospace, Menlo, monospace; }
+  button {
+    font: inherit;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+  }
+  button:hover { background: #f0f1f3; }
+  button.primary {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: var(--accent);
+  }
+  button.primary:hover { background: #1958c2; }
+  button.primary:disabled {
+    background: #9aa0a6;
+    border-color: #9aa0a6;
+    cursor: not-allowed;
+  }
+  button.danger { color: var(--danger); }
+  button.tiny { padding: 2px 8px; font-size: 12px; }
+  .status {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: #eef0f3;
+  }
+  .status.ok { color: var(--ok); background: #e7f5ec; }
+  .status.err { color: var(--danger); background: #fdecea; }
+  .status.warn { color: var(--warn); background: #fdf3e3; }
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  nav.tabs button {
+    border: none;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    padding: 10px 14px;
+    color: var(--muted);
+  }
+  nav.tabs button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  main { padding: 16px 20px; }
+  section.tab { display: none; }
+  section.tab.active { display: block; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+  .toolbar .count { color: var(--muted); font-size: 12px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: #eef0f3;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td input, td select, td textarea {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 4px 6px;
+    border-radius: 3px;
+  }
+  td input:focus, td select:focus, td textarea:focus {
+    background: #fff;
+    border-color: var(--accent);
+    outline: none;
+  }
+  td textarea { resize: vertical; min-height: 28px; }
+  td.actions { width: 40px; text-align: center; }
+  .empty {
+    padding: 30px;
+    text-align: center;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+  }
+  .setup {
+    margin: 40px auto;
+    max-width: 720px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+  }
+  .setup h2 { margin-top: 0; }
+  .setup pre {
+    background: #1a1d21;
+    color: #e6e8eb;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    overflow-x: auto;
+  }
+  .setup ol li { margin: 6px 0; }
+  .dirty-mark { color: var(--warn); font-weight: 700; }
+  .col-narrow { width: 110px; }
+  .col-medium { width: 160px; }
+  .col-status { width: 130px; }
+  .col-bool { width: 70px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ассистент</h1>
+  <div class="field">
+    <label>Код синхронизации</label>
+    <input id="codeInput" class="code" type="text" placeholder="введите свой код" autocomplete="off" />
+    <button id="connectBtn">Подключиться</button>
+  </div>
+  <span id="status" class="status">не подключено</span>
+  <div class="spacer"></div>
+  <span id="dirtyMark" class="status warn" style="display:none">несохранённые изменения</span>
+  <button id="reloadBtn" title="Перетянуть актуальный снимок из облака">Обновить</button>
+  <button id="saveBtn" class="primary" disabled>Сохранить в облако</button>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="orders" class="active">Заказы</button>
+  <button data-tab="reminders">Напоминания</button>
+  <button data-tab="materials">Материалы</button>
+  <button data-tab="workPlaces">Места</button>
+  <button data-tab="expenses">Расходы</button>
+</nav>
+
+<main>
+  <!-- Заказы -->
+  <section class="tab active" id="tab-orders">
+    <div class="toolbar">
+      <button id="addOrder">+ Новый заказ</button>
+      <span class="count" id="ordersCount"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Клиент</th>
+          <th>Телефон</th>
+          <th>Адрес</th>
+          <th>Кв.</th>
+          <th>Подъезд</th>
+          <th>Описание</th>
+          <th class="col-narrow">Цена, ₽</th>
+          <th class="col-narrow">Модель</th>
+          <th class="col-narrow">Наценка, ₽</th>
+          <th class="col-status">Статус</th>
+          <th class="col-medium">Назначено на</th>
+          <th class="col-bool">Напом.</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="ordersBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Напоминания -->
+  <section class="tab" id="tab-reminders">
+    <div class="toolbar">
+      <button id="addReminder">+ Новое напоминание</button>
+      <span class="count" id="remindersCount"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Заголовок</th>
+          <th>Описание</th>
+          <th class="col-medium">Когда</th>
+          <th class="col-bool">Готово</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="remindersBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Материалы -->
+  <section class="tab" id="tab-materials">
+    <div class="toolbar">
+      <button id="addMaterial">+ Новая позиция</button>
+      <span class="count" id="materialsCount"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th class="col-narrow">Ед.</th>
+          <th class="col-narrow">Остаток</th>
+          <th class="col-narrow">Минимум</th>
+          <th>Примечание</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="materialsBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Места работы -->
+  <section class="tab" id="tab-workPlaces">
+    <div class="toolbar">
+      <button id="addWorkPlace">+ Новое место</button>
+      <span class="count" id="workPlacesCount"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th>Описание</th>
+          <th class="col-narrow">Широта</th>
+          <th class="col-narrow">Долгота</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="workPlacesBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Расходы -->
+  <section class="tab" id="tab-expenses">
+    <div class="toolbar">
+      <button id="addExpense">+ Новый расход</button>
+      <span class="count" id="expensesCount"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th class="col-narrow">Сумма, ₽</th>
+          <th>Заметка</th>
+          <th class="col-medium">Когда</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="expensesBody"></tbody>
+    </table>
+  </section>
+
+  <div id="setupNotice" class="setup" style="display:none">
+    <h2>Нужно один раз настроить Firebase Web</h2>
+    <p>
+      Скопируй этот файл к себе на компьютер, открой его в текстовом редакторе,
+      и в самом верху <code>&lt;script type="module"&gt;</code> подставь свой
+      <code>firebaseConfig</code>. Получить его можно так:
+    </p>
+    <ol>
+      <li>Зайди в <a href="https://console.firebase.google.com/project/kiltler/settings/general" target="_blank">Firebase Console → Project Settings → Your apps</a></li>
+      <li>Кнопка <b>Add app → Web (&lt;/&gt;)</b>. Имя можно любое, например <code>web-editor</code>.</li>
+      <li>Скопируй объект <code>firebaseConfig</code> и вставь в этот файл вместо плейсхолдера.</li>
+      <li>В Authentication → Sign-in method включи <b>Anonymous</b> (если ещё не включено).</li>
+    </ol>
+    <p>Также убедись, что Firestore Rules разрешают чтение/запись коллекции <code>sync</code> анонимным пользователям — то же самое, что использует приложение на телефоне.</p>
+  </div>
+</main>
+
+<script type="module">
+// ============================================================
+// FIREBASE CONFIG — ПОДСТАВЬ СВОЙ ОБЪЕКТ ИЗ КОНСОЛИ FIREBASE
+// (Project Settings → Your apps → Web app → SDK setup)
+// ============================================================
+const firebaseConfig = {
+  apiKey: "PASTE_WEB_API_KEY_HERE",
+  authDomain: "kiltler.firebaseapp.com",
+  projectId: "kiltler",
+  storageBucket: "kiltler.firebasestorage.app",
+  messagingSenderId: "661772104894",
+  appId: "PASTE_WEB_APP_ID_HERE"
+};
+// ============================================================
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const setupNotice = document.getElementById('setupNotice');
+const isConfigured =
+  firebaseConfig.apiKey !== "PASTE_WEB_API_KEY_HERE" &&
+  firebaseConfig.appId !== "PASTE_WEB_APP_ID_HERE";
+
+if (!isConfigured) {
+  setupNotice.style.display = 'block';
+}
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const ORDER_STATUSES = [
+  { value: 'NEW',         label: 'Новый' },
+  { value: 'IN_PROGRESS', label: 'В работе' },
+  { value: 'DONE',        label: 'Выполнен' },
+  { value: 'CANCELLED',   label: 'Отменён' },
+];
+
+const state = {
+  code: null,
+  unsub: null,
+  dirty: false,
+  lastRemoteJson: null,
+  data: emptyData(),
+};
+
+function emptyData() {
+  return {
+    version: 2,
+    exportedAt: Date.now(),
+    reminders: [],
+    orders: [],
+    materials: [],
+    workPlaces: [],
+    expenses: [],
+  };
+}
+
+// Long ID, совместимый с Room autoGenerate: положительное 53-битное число.
+function newId() {
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+}
+
+const $ = sel => document.querySelector(sel);
+const statusEl = $('#status');
+const dirtyMark = $('#dirtyMark');
+const saveBtn = $('#saveBtn');
+const reloadBtn = $('#reloadBtn');
+
+function setStatus(text, cls = '') {
+  statusEl.textContent = text;
+  statusEl.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+function markDirty() {
+  state.dirty = true;
+  dirtyMark.style.display = '';
+  saveBtn.disabled = false;
+}
+
+function markClean() {
+  state.dirty = false;
+  dirtyMark.style.display = 'none';
+  saveBtn.disabled = !state.code;
+}
+
+// ---------- Подключение / синк ----------
+
+document.getElementById('connectBtn').addEventListener('click', async () => {
+  const code = $('#codeInput').value.trim();
+  if (!code) {
+    setStatus('введи код', 'err');
+    return;
+  }
+  if (state.dirty && !confirm('Есть несохранённые изменения. Подключиться к другому коду и потерять их?')) {
+    return;
+  }
+  await connect(code);
+});
+
+reloadBtn.addEventListener('click', async () => {
+  if (!state.code) return;
+  if (state.dirty && !confirm('Локальные изменения будут перезаписаны облачным снимком. Продолжить?')) return;
+  await pullOnce();
+});
+
+saveBtn.addEventListener('click', async () => {
+  if (!state.code) return;
+  saveBtn.disabled = true;
+  try {
+    state.data.exportedAt = Date.now();
+    const json = JSON.stringify(state.data, null, 2);
+    await setDoc(doc(db, 'sync', state.code), {
+      data: json,
+      updatedAt: Date.now(),
+    });
+    state.lastRemoteJson = json;
+    markClean();
+    setStatus(`сохранено в sync/${state.code}`, 'ok');
+  } catch (e) {
+    console.error(e);
+    setStatus('ошибка сохранения: ' + (e.message || e.code), 'err');
+    saveBtn.disabled = false;
+  }
+});
+
+async function connect(code) {
+  setStatus('логин в Firebase…');
+  try {
+    await signInAnonymously(auth);
+  } catch (e) {
+    setStatus('Firebase auth не работает: ' + (e.code || e.message), 'err');
+    return;
+  }
+
+  if (state.unsub) { state.unsub(); state.unsub = null; }
+  state.code = code;
+  localStorage.setItem('syncCode', code);
+
+  setStatus(`подключение к sync/${code}…`);
+  state.unsub = onSnapshot(doc(db, 'sync', code), snap => {
+    if (!snap.exists()) {
+      setStatus(`sync/${code} пуст — телефон ещё не пушил данные`, 'warn');
+      return;
+    }
+    if (snap.metadata.hasPendingWrites) return;
+    const json = snap.get('data');
+    if (json == null) {
+      setStatus(`sync/${code}: документ без поля data`, 'warn');
+      return;
+    }
+    if (json === state.lastRemoteJson) return;
+    if (state.dirty) {
+      setStatus('облако обновилось, но есть локальные правки — Обновить, чтобы перетянуть', 'warn');
+      return;
+    }
+    applyRemoteJson(json);
+    setStatus(`синхронизировано (${new Date(snap.get('updatedAt') || Date.now()).toLocaleString('ru-RU')})`, 'ok');
+  }, err => {
+    setStatus('Firestore listener error: ' + err.code, 'err');
+  });
+}
+
+async function pullOnce() {
+  if (!state.code) return;
+  setStatus('загрузка…');
+  try {
+    const snap = await getDoc(doc(db, 'sync', state.code));
+    if (!snap.exists()) {
+      setStatus(`sync/${state.code} пуст`, 'warn');
+      return;
+    }
+    const json = snap.get('data');
+    if (json == null) { setStatus('документ без поля data', 'warn'); return; }
+    applyRemoteJson(json);
+    setStatus(`загружено (${new Date(snap.get('updatedAt') || Date.now()).toLocaleString('ru-RU')})`, 'ok');
+  } catch (e) {
+    setStatus('ошибка загрузки: ' + (e.message || e.code), 'err');
+  }
+}
+
+function applyRemoteJson(json) {
+  try {
+    const parsed = JSON.parse(json);
+    state.data = {
+      version: parsed.version ?? 2,
+      exportedAt: parsed.exportedAt ?? Date.now(),
+      reminders:  Array.isArray(parsed.reminders)  ? parsed.reminders  : [],
+      orders:     Array.isArray(parsed.orders)     ? parsed.orders     : [],
+      materials:  Array.isArray(parsed.materials)  ? parsed.materials  : [],
+      workPlaces: Array.isArray(parsed.workPlaces) ? parsed.workPlaces : [],
+      expenses:   Array.isArray(parsed.expenses)   ? parsed.expenses   : [],
+    };
+    state.lastRemoteJson = json;
+    markClean();
+    renderAll();
+  } catch (e) {
+    setStatus('не удалось распарсить JSON из облака', 'err');
+  }
+}
+
+// ---------- Вкладки ----------
+
+document.getElementById('tabs').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  const tab = e.target.dataset.tab;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b === e.target));
+  document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
+});
+
+// ---------- Рендер таблиц ----------
+
+function renderAll() {
+  renderOrders();
+  renderReminders();
+  renderMaterials();
+  renderWorkPlaces();
+  renderExpenses();
+}
+
+// Преобразование millis ↔ значение datetime-local
+function millisToInput(ms) {
+  if (!ms) return '';
+  const d = new Date(Number(ms));
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function inputToMillis(val) {
+  if (!val) return null;
+  return new Date(val).getTime();
+}
+
+function makeInput(value, type, onChange, attrs = {}) {
+  const input = document.createElement('input');
+  input.type = type;
+  if (value != null) input.value = value;
+  for (const [k, v] of Object.entries(attrs)) input.setAttribute(k, v);
+  input.addEventListener('input', () => { onChange(input.value); markDirty(); });
+  return input;
+}
+
+function makeTextarea(value, onChange) {
+  const t = document.createElement('textarea');
+  t.rows = 1;
+  t.value = value || '';
+  t.addEventListener('input', () => { onChange(t.value); markDirty(); });
+  return t;
+}
+
+function makeSelect(value, options, onChange) {
+  const sel = document.createElement('select');
+  for (const opt of options) {
+    const o = document.createElement('option');
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (opt.value === value) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener('change', () => { onChange(sel.value); markDirty(); });
+  return sel;
+}
+
+function makeCheckbox(value, onChange) {
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = !!value;
+  cb.addEventListener('change', () => { onChange(cb.checked); markDirty(); });
+  return cb;
+}
+
+function deleteCell(arr, item) {
+  const td = document.createElement('td');
+  td.className = 'actions';
+  const btn = document.createElement('button');
+  btn.className = 'tiny danger';
+  btn.textContent = '✕';
+  btn.title = 'Удалить';
+  btn.addEventListener('click', () => {
+    if (!confirm('Удалить запись?')) return;
+    const idx = arr.indexOf(item);
+    if (idx >= 0) arr.splice(idx, 1);
+    markDirty();
+    renderAll();
+  });
+  td.appendChild(btn);
+  return td;
+}
+
+function wrap(el) {
+  const td = document.createElement('td');
+  td.appendChild(el);
+  return td;
+}
+
+// ---- Заказы ----
+function renderOrders() {
+  const body = document.getElementById('ordersBody');
+  body.innerHTML = '';
+  for (const o of state.data.orders) {
+    const tr = document.createElement('tr');
+    tr.appendChild(wrap(makeInput(o.clientName, 'text', v => o.clientName = v)));
+    tr.appendChild(wrap(makeInput(o.phone, 'tel', v => o.phone = v)));
+    tr.appendChild(wrap(makeInput(o.address, 'text', v => o.address = v)));
+    tr.appendChild(wrap(makeInput(o.apartment, 'text', v => o.apartment = v)));
+    tr.appendChild(wrap(makeInput(o.entrance, 'text', v => o.entrance = v)));
+    tr.appendChild(wrap(makeTextarea(o.description, v => o.description = v)));
+    tr.appendChild(wrap(makeInput(o.price, 'number', v => o.price = parseFloat(v) || 0, { step: '0.01' })));
+    tr.appendChild(wrap(makeInput(o.acModel, 'text', v => o.acModel = v)));
+    tr.appendChild(wrap(makeInput(o.acMargin, 'number', v => o.acMargin = parseFloat(v) || 0, { step: '0.01' })));
+    tr.appendChild(wrap(makeSelect(o.status || 'NEW', ORDER_STATUSES, v => o.status = v)));
+    tr.appendChild(wrap(makeInput(
+      millisToInput(o.scheduledMillis), 'datetime-local',
+      v => o.scheduledMillis = inputToMillis(v)
+    )));
+    const td = document.createElement('td');
+    td.className = 'col-bool';
+    td.appendChild(makeCheckbox(o.reminderEnabled !== false, v => o.reminderEnabled = v));
+    tr.appendChild(td);
+    tr.appendChild(deleteCell(state.data.orders, o));
+    body.appendChild(tr);
+  }
+  document.getElementById('ordersCount').textContent = `${state.data.orders.length} шт.`;
+}
+document.getElementById('addOrder').addEventListener('click', () => {
+  state.data.orders.push({
+    id: newId(),
+    clientName: '', phone: '', address: '', apartment: '', entrance: '',
+    description: '', price: 0, acModel: '', acMargin: 0,
+    status: 'NEW',
+    scheduledMillis: null,
+    reminderEnabled: true,
+    createdAt: Date.now(),
+  });
+  markDirty();
+  renderOrders();
+});
+
+// ---- Напоминания ----
+function renderReminders() {
+  const body = document.getElementById('remindersBody');
+  body.innerHTML = '';
+  for (const r of state.data.reminders) {
+    const tr = document.createElement('tr');
+    tr.appendChild(wrap(makeInput(r.title, 'text', v => r.title = v)));
+    tr.appendChild(wrap(makeTextarea(r.description, v => r.description = v)));
+    tr.appendChild(wrap(makeInput(
+      millisToInput(r.timeMillis), 'datetime-local',
+      v => r.timeMillis = inputToMillis(v) || 0
+    )));
+    const td = document.createElement('td');
+    td.className = 'col-bool';
+    td.appendChild(makeCheckbox(r.isDone, v => r.isDone = v));
+    tr.appendChild(td);
+    tr.appendChild(deleteCell(state.data.reminders, r));
+    body.appendChild(tr);
+  }
+  document.getElementById('remindersCount').textContent = `${state.data.reminders.length} шт.`;
+}
+document.getElementById('addReminder').addEventListener('click', () => {
+  state.data.reminders.push({
+    id: newId(),
+    title: '', description: '', timeMillis: Date.now(),
+    isDone: false, createdAt: Date.now(),
+  });
+  markDirty();
+  renderReminders();
+});
+
+// ---- Материалы ----
+function renderMaterials() {
+  const body = document.getElementById('materialsBody');
+  body.innerHTML = '';
+  for (const m of state.data.materials) {
+    const tr = document.createElement('tr');
+    tr.appendChild(wrap(makeInput(m.name, 'text', v => m.name = v)));
+    tr.appendChild(wrap(makeInput(m.unit || 'шт', 'text', v => m.unit = v)));
+    tr.appendChild(wrap(makeInput(m.quantity, 'number', v => m.quantity = parseFloat(v) || 0, { step: '0.01' })));
+    tr.appendChild(wrap(makeInput(m.minQuantity, 'number', v => m.minQuantity = parseFloat(v) || 0, { step: '0.01' })));
+    tr.appendChild(wrap(makeTextarea(m.note, v => m.note = v)));
+    tr.appendChild(deleteCell(state.data.materials, m));
+    body.appendChild(tr);
+  }
+  document.getElementById('materialsCount').textContent = `${state.data.materials.length} шт.`;
+}
+document.getElementById('addMaterial').addEventListener('click', () => {
+  state.data.materials.push({
+    id: newId(),
+    name: '', unit: 'шт', quantity: 0, minQuantity: 0, note: '',
+  });
+  markDirty();
+  renderMaterials();
+});
+
+// ---- Места работы ----
+function renderWorkPlaces() {
+  const body = document.getElementById('workPlacesBody');
+  body.innerHTML = '';
+  for (const p of state.data.workPlaces) {
+    const tr = document.createElement('tr');
+    tr.appendChild(wrap(makeInput(p.title, 'text', v => p.title = v)));
+    tr.appendChild(wrap(makeTextarea(p.description, v => p.description = v)));
+    tr.appendChild(wrap(makeInput(p.latitude, 'number', v => p.latitude = parseFloat(v) || 0, { step: '0.000001' })));
+    tr.appendChild(wrap(makeInput(p.longitude, 'number', v => p.longitude = parseFloat(v) || 0, { step: '0.000001' })));
+    tr.appendChild(deleteCell(state.data.workPlaces, p));
+    body.appendChild(tr);
+  }
+  document.getElementById('workPlacesCount').textContent = `${state.data.workPlaces.length} шт.`;
+}
+document.getElementById('addWorkPlace').addEventListener('click', () => {
+  state.data.workPlaces.push({
+    id: newId(),
+    title: '', description: '', latitude: 0, longitude: 0,
+    createdAt: Date.now(),
+  });
+  markDirty();
+  renderWorkPlaces();
+});
+
+// ---- Расходы ----
+function renderExpenses() {
+  const body = document.getElementById('expensesBody');
+  body.innerHTML = '';
+  for (const ex of state.data.expenses) {
+    const tr = document.createElement('tr');
+    tr.appendChild(wrap(makeInput(ex.amount, 'number', v => ex.amount = parseFloat(v) || 0, { step: '0.01' })));
+    tr.appendChild(wrap(makeTextarea(ex.note, v => ex.note = v)));
+    tr.appendChild(wrap(makeInput(
+      millisToInput(ex.createdAtMillis), 'datetime-local',
+      v => ex.createdAtMillis = inputToMillis(v) || Date.now()
+    )));
+    tr.appendChild(deleteCell(state.data.expenses, ex));
+    body.appendChild(tr);
+  }
+  document.getElementById('expensesCount').textContent = `${state.data.expenses.length} шт.`;
+}
+document.getElementById('addExpense').addEventListener('click', () => {
+  state.data.expenses.push({
+    id: newId(),
+    amount: 0, note: '', createdAtMillis: Date.now(),
+  });
+  markDirty();
+  renderExpenses();
+});
+
+// ---------- Старт ----------
+const saved = localStorage.getItem('syncCode');
+if (saved) {
+  $('#codeInput').value = saved;
+  if (isConfigured) connect(saved);
+}
+renderAll();
+</script>
+
+</body>
+</html>
