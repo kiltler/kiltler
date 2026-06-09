@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircle
@@ -39,10 +41,12 @@ import com.bodyquest.app.domain.PlannedExercise
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.seed.ExerciseCatalog
 import com.bodyquest.app.ui.AppUiState
+import com.bodyquest.app.ui.art.ExercisePoseView
 import com.bodyquest.app.ui.openTechniqueVideo
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.theme.BqSecondary
+import com.bodyquest.app.ui.theme.BqSurfaceVariant
 import com.bodyquest.app.ui.theme.BqTertiary
 import kotlinx.coroutines.delay
 
@@ -161,15 +165,28 @@ private fun ExerciseBlock(
     val ex = ExerciseCatalog.get(planned.exerciseId)
     val context = LocalContext.current
     BqCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Text(ex?.name ?: planned.exerciseId, style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Surface(
+                color = BqSurfaceVariant,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.size(64.dp),
+            ) {
+                ExercisePoseView(
+                    exerciseId = planned.exerciseId,
+                    modifier = Modifier.size(64.dp).padding(6.dp),
+                )
+            }
+            Column(Modifier.weight(1f)) {
+                Text(ex?.name ?: planned.exerciseId, style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold)
+                Text("${planned.sets} × ${planned.targetReps}", style = MaterialTheme.typography.bodyMedium,
+                    color = BqSecondary)
+            }
             IconButton(onClick = { openTechniqueVideo(context, ex?.name ?: planned.exerciseId) }) {
                 Icon(Icons.Filled.PlayCircle, contentDescription = "Видео техники", tint = BqSecondary)
             }
         }
-        Text("${planned.sets} × ${planned.targetReps}", style = MaterialTheme.typography.bodyMedium, color = BqSecondary)
         if (planned.note.isNotBlank()) {
             Text(planned.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

@@ -22,6 +22,7 @@ import com.bodyquest.app.ui.components.KeyValueRow
 import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.components.StatPill
 import com.bodyquest.app.ui.components.XpBar
+import com.bodyquest.app.ui.theme.AttrComposition
 import com.bodyquest.app.ui.theme.AttrEndurance
 import com.bodyquest.app.ui.theme.BqSecondary
 import com.bodyquest.app.ui.theme.BqTertiary
@@ -31,6 +32,7 @@ fun NutritionScreen(
     state: AppUiState,
     onAddWater: (Int) -> Unit,
     onResetWater: () -> Unit,
+    onSetSleep: (Double) -> Unit,
 ) {
     val plan = state.nutrition ?: return
     Column(
@@ -74,6 +76,23 @@ fun NutritionScreen(
                 OutlinedButton(onClick = { onAddWater(250) }, modifier = Modifier.weight(1f)) { Text("+250 мл") }
                 OutlinedButton(onClick = { onAddWater(500) }, modifier = Modifier.weight(1f)) { Text("+500 мл") }
                 OutlinedButton(onClick = onResetWater, modifier = Modifier.weight(1f)) { Text("Сброс") }
+            }
+        }
+
+        BqCard(Modifier.fillMaxWidth()) {
+            SectionTitle("😴 Сон — восстановление")
+            val goal = 8.0
+            Text("${"%.1f".format(state.sleepHours)} / 8 ч",
+                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            XpBar((state.sleepHours / goal).toFloat(), color = AttrComposition, modifier = Modifier.padding(vertical = 8.dp))
+            Text("Мышцы растут во сне. Цель — 7–9 часов. Ачивка за 8+ часов!",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                OutlinedButton(onClick = { onSetSleep((state.sleepHours - 0.5).coerceAtLeast(0.0)) },
+                    modifier = Modifier.weight(1f)) { Text("− 0.5 ч") }
+                OutlinedButton(onClick = { onSetSleep((state.sleepHours + 0.5).coerceAtMost(24.0)) },
+                    modifier = Modifier.weight(1f)) { Text("+ 0.5 ч") }
             }
         }
 

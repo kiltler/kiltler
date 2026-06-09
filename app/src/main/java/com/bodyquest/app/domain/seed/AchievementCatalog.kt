@@ -21,6 +21,17 @@ object AchievementCatalog {
     const val LEVEL_10 = "level_10"
     const val WEIGHT_MINUS_3 = "weight_minus_3"
     const val SHOULDERS_PRIORITY = "shoulders_5k"
+    const val TWENTYFIVE_WORKOUTS = "twentyfive_workouts"
+    const val STREAK_14 = "streak_14"
+    const val LEVEL_20 = "level_20"
+    const val LEVEL_35 = "level_35"
+    const val LEVEL_50 = "level_50"
+    const val PULLUP_15 = "pullup_15"
+    const val BOSS_3 = "boss_3"
+    const val SLEEP_8 = "sleep_8"
+    const val ENDURANCE_2000 = "endurance_2000"
+    const val MOBILITY_1000 = "mobility_1000"
+    const val WAIST_MINUS_10 = "waist_minus_10"
 
     val all = listOf(
         AchievementDef(FIRST_WORKOUT, "Первая тренировка", "Завершите первую тренировку", "🎯"),
@@ -34,7 +45,18 @@ object AchievementCatalog {
         AchievementDef(PULLUP_10, "Первое подтягивание ×10", "10 подтягиваний в подходе", "🦾"),
         AchievementDef(SHOULDERS_PRIORITY, "Кузнец плеч", "Накопите 1500 XP Силы", "🛠️"),
         AchievementDef(BOSS_SLAIN, "Босс повержен", "Завершите Босса недели", "👑"),
+        AchievementDef(BOSS_3, "Охотник на боссов", "Повергните 3 Босса", "⚔️"),
         AchievementDef(LEVEL_10, "Атлет", "Достигните 10 уровня", "🏅"),
+        AchievementDef(LEVEL_20, "Воин", "Достигните 20 уровня", "🛡️"),
+        AchievementDef(LEVEL_35, "Чемпион", "Достигните 35 уровня", "🏆"),
+        AchievementDef(LEVEL_50, "Легенда", "Достигните 50 уровня", "🐉"),
+        AchievementDef(TWENTYFIVE_WORKOUTS, "Ветеран", "25 завершённых тренировок", "🎖️"),
+        AchievementDef(STREAK_14, "Две недели огня", "Серия 14 дней", "☄️"),
+        AchievementDef(PULLUP_15, "Король турника", "15 подтягиваний в подходе", "👑"),
+        AchievementDef(ENDURANCE_2000, "Двигатель", "Накопите 2000 XP Выносливости", "🫁"),
+        AchievementDef(MOBILITY_1000, "Гибкий как лоза", "Накопите 1000 XP Мобильности", "🤸"),
+        AchievementDef(SLEEP_8, "Сон чемпиона", "Запишите ночь с 8+ часами сна", "😴"),
+        AchievementDef(WAIST_MINUS_10, "Осиная талия", "Талия уменьшилась на 10 см", "🏵️"),
     )
 
     val byId = all.associateBy { it.id }

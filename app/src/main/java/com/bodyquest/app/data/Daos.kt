@@ -200,3 +200,24 @@ interface WaterDao {
     @Query("DELETE FROM water_log")
     suspend fun clear()
 }
+
+@Dao
+interface SleepDao {
+    @Query("SELECT * FROM sleep_log WHERE dateEpochDay = :day")
+    fun flowForDay(day: Long): Flow<SleepEntity?>
+
+    @Query("SELECT * FROM sleep_log")
+    suspend fun allOnce(): List<SleepEntity>
+
+    @Query("SELECT COALESCE(MAX(hours), 0) FROM sleep_log")
+    suspend fun maxHours(): Double
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(sleep: SleepEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(items: List<SleepEntity>)
+
+    @Query("DELETE FROM sleep_log")
+    suspend fun clear()
+}

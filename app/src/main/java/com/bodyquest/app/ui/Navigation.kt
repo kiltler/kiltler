@@ -137,7 +137,12 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                 }
                 composable(Routes.PROGRESS) { ProgressScreen(state) }
                 composable(Routes.NUTRITION) {
-                    NutritionScreen(state, onAddWater = vm::addWater, onResetWater = { vm.setWater(0) })
+                    NutritionScreen(
+                        state,
+                        onAddWater = vm::addWater,
+                        onResetWater = { vm.setWater(0) },
+                        onSetSleep = vm::setSleep,
+                    )
                 }
                 composable(Routes.PROFILE) {
                     ProfileScreen(
@@ -161,8 +166,8 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                     val program = state.program
                     val day = when {
                         program == null -> null
-                        dayId == program.boss.id -> program.boss
                         dayId == ProgramSeed.mobilityDay.id -> ProgramSeed.mobilityDay
+                        program.bosses.any { it.id == dayId } -> program.bosses.first { it.id == dayId }
                         else -> program.days.find { it.id == dayId }
                     }
                     if (day == null) {

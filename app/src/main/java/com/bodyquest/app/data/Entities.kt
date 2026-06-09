@@ -117,3 +117,9 @@ data class WaterEntity(
     @PrimaryKey val dateEpochDay: Long,
     val amountMl: Int = 0,
 )
+
+@Entity(tableName = "sleep_log")
+data class SleepEntity(
+    @PrimaryKey val dateEpochDay: Long,
+    val hours: Double = 0.0,
+)

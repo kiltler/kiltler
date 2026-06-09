@@ -14,13 +14,15 @@ enum class AttributeType(val title: String, val emoji: String, val colorArgb: Lo
 }
 
 /** Ранги по общему уровню персонажа. */
-enum class Rank(val title: String, val minLevel: Int) {
-    RECRUIT("Новобранец", 1),
-    FIGHTER("Боец", 5),
-    ATHLETE("Атлет", 10),
-    WARRIOR("Воин", 20),
-    CHAMPION("Чемпион", 35),
-    LEGEND("Легенда", 50);
+enum class Rank(val title: String, val minLevel: Int, val flavor: String) {
+    RECRUIT("Новобранец", 1, "Путь только начинается. Мягкий живот, слабые руки — но искра уже есть."),
+    FIGHTER("Боец", 5, "Появилась дисциплина и первые мышцы. Ты уже не сдаёшься на полпути."),
+    ATHLETE("Атлет", 10, "Тело окрепло, силуэт подтянулся. Плечи становятся шире, талия — уже."),
+    WARRIOR("Воин", 20, "Крепкая броня мышц и стальная воля. V-силуэт виден невооружённым глазом."),
+    CHAMPION("Чемпион", 35, "Мощь и рельеф. Ты пример для других — и сам себе соперник."),
+    LEGEND("Легенда", 50, "Гора мышц и несгибаемый дух. Скала, высеченная годами труда.");
+
+    val index: Int get() = ordinal
 
     companion object {
         fun forLevel(level: Int): Rank =

@@ -43,6 +43,7 @@ data class AppUiState(
     val isRestDay: Boolean = false,
     val nutrition: NutritionPlan? = null,
     val waterMl: Int = 0,
+    val sleepHours: Double = 0.0,
     val achievements: List<AchievementUi> = emptyList(),
     val sets: List<SetEntity> = emptyList(),
     val prs: Map<String, ExercisePrEntity> = emptyMap(),

@@ -3,18 +3,21 @@ package com.bodyquest.app.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.AttributeType
+import com.bodyquest.app.ui.art.RankFigure
 import com.bodyquest.app.ui.theme.BqOutline
 import com.bodyquest.app.ui.theme.BqPrimary
+import com.bodyquest.app.ui.theme.BqTertiary
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
@@ -29,9 +32,10 @@ fun RadarChart(
     levels: Map<AttributeType, Int>,
     modifier: Modifier = Modifier,
     fill: Color = BqPrimary,
+    rankIndex: Int? = null,
 ) {
     val order = AttributeType.entries.toList()
-    Box(modifier.fillMaxWidth().aspectRatio(1f)) {
+    Box(modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxWidth().aspectRatio(1f)) {
             val cx = size.width / 2f
             val cy = size.height / 2f
@@ -103,6 +107,16 @@ fun RadarChart(
                     drawText("ур.$lvl", labelPoint.x, labelPoint.y + paint.textSize * 1.05f, paint)
                 }
             }
+        }
+
+        // Фигура героя в центре, соответствующая рангу
+        if (rankIndex != null) {
+            RankFigure(
+                rankIndex = rankIndex,
+                modifier = Modifier.fillMaxSize(0.30f),
+                color = fill,
+                accent = BqTertiary,
+            )
         }
     }
 }

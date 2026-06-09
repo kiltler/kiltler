@@ -2,9 +2,11 @@ package com.bodyquest.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -35,8 +37,8 @@ fun ProgramScreen(state: AppUiState, onStartQuest: (String) -> Unit) {
         SectionTitle("Недельный план")
         program.days.forEach { day -> DayCard(day, onStartQuest) }
 
-        SectionTitle("Босс недели")
-        DayCard(program.boss, onStartQuest, accentBoss = true)
+        SectionTitle("Боссы (ротация по неделям)")
+        program.bosses.forEach { boss -> DayCard(boss, onStartQuest, accentBoss = true) }
 
         SectionTitle("Принципы")
         BqCard(Modifier.fillMaxWidth()) {
@@ -50,8 +52,19 @@ fun ProgramScreen(state: AppUiState, onStartQuest: (String) -> Unit) {
 @Composable
 private fun DayCard(day: WorkoutDay, onStart: (String) -> Unit, accentBoss: Boolean = false) {
     BqCard(Modifier.fillMaxWidth()) {
-        Text(day.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-            color = if (accentBoss) BqTertiary else MaterialTheme.colorScheme.onSurface)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (accentBoss && day.portrait.isNotBlank()) {
+                Text(day.portrait, style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(end = 10.dp))
+            }
+            Column {
+                Text(day.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    color = if (accentBoss) BqTertiary else MaterialTheme.colorScheme.onSurface)
+                if (accentBoss && day.bossSubtitle.isNotBlank()) {
+                    Text(day.bossSubtitle, style = MaterialTheme.typography.labelMedium, color = BqTertiary)
+                }
+            }
+        }
         Text(day.focus, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(Modifier.padding(top = 8.dp)) {
             day.exercises.forEach { p ->

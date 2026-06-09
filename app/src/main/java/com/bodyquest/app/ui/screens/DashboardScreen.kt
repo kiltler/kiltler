@@ -1,5 +1,6 @@
 package com.bodyquest.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,6 +29,7 @@ import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.CharacterState
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.RadarChart
+import com.bodyquest.app.ui.components.RankSystemDialog
 import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.components.StatPill
 import com.bodyquest.app.ui.components.XpBar
@@ -32,10 +38,17 @@ import com.bodyquest.app.ui.theme.BqTertiary
 
 @Composable
 fun CharacterCard(character: CharacterState) {
+    var showRanks by remember { mutableStateOf(false) }
+    if (showRanks) RankSystemDialog(currentRank = character.rank, onDismiss = { showRanks = false })
+
     BqCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+        Row(
+            Modifier.fillMaxWidth().clickable { showRanks = true },
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
             Column {
-                Text(character.rank.title.uppercase(), color = BqTertiary, fontWeight = FontWeight.Black,
+                Text(character.rank.title.uppercase() + "  ›", color = BqTertiary, fontWeight = FontWeight.Black,
                     style = MaterialTheme.typography.titleMedium)
                 Text(character.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
             }
@@ -59,7 +72,8 @@ fun CharacterCard(character: CharacterState) {
         val levels = character.attributes.mapValues { it.value.level }
         val maxCont = character.attributes.values.maxOf { it.level + it.fraction }.coerceAtLeast(1f)
         val values = character.attributes.mapValues { (it.value.level + it.value.fraction) / maxCont }
-        RadarChart(values = values, levels = levels, modifier = Modifier.padding(top = 12.dp))
+        RadarChart(values = values, levels = levels, modifier = Modifier.padding(top = 12.dp),
+            rankIndex = character.rank.index)
 
         // Полосы характеристик
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -105,7 +119,13 @@ fun DashboardScreen(
                 }
             } else {
                 if (quest.isBoss) {
-                    Text("👑 БОСС НЕДЕЛИ", color = BqTertiary, fontWeight = FontWeight.Black)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (quest.portrait.isNotBlank()) {
+                            Text(quest.portrait, style = MaterialTheme.typography.headlineLarge,
+                                modifier = Modifier.padding(end = 8.dp))
+                        }
+                        Text("👑 БОСС НЕДЕЛИ", color = BqTertiary, fontWeight = FontWeight.Black)
+                    }
                 }
                 Text(quest.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(quest.focus, style = MaterialTheme.typography.bodyMedium,

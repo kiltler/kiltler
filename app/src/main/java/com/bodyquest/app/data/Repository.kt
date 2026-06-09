@@ -27,6 +27,7 @@ class Repository(private val db: AppDatabase) {
     private val streakDao = db.streakDao()
     private val settingsDao = db.settingsDao()
     private val waterDao = db.waterDao()
+    private val sleepDao = db.sleepDao()
 
     // ─────────────────────────── Flows ───────────────────────────
     val profile: Flow<UserProfileEntity?> = profileDao.flow()
@@ -43,6 +44,7 @@ class Repository(private val db: AppDatabase) {
     val prs: Flow<List<ExercisePrEntity>> = prDao.flowAll()
 
     fun waterTodayFlow(): Flow<WaterEntity?> = waterDao.flowForDay(Dates.todayEpochDay())
+    fun sleepTodayFlow(): Flow<SleepEntity?> = sleepDao.flowForDay(Dates.todayEpochDay())
 
     // ─────────────────────────── Seed ───────────────────────────
     suspend fun seedIfNeeded() {
@@ -284,6 +286,7 @@ class Repository(private val db: AppDatabase) {
         val xp = workoutDao.xpTotals()
         val totalAll = xp.s + xp.e + xp.m + xp.d + measurementDao.compositionXp()
         val level = Leveling.levelFor(totalAll)
+        val maxSleep = sleepDao.maxHours()
         val now = System.currentTimeMillis()
 
         val unlocked = mutableListOf<AchievementDef>()
@@ -300,7 +303,18 @@ class Repository(private val db: AppDatabase) {
                 AchievementCatalog.PULLUP_10 -> pullupBest >= 10
                 AchievementCatalog.SHOULDERS_PRIORITY -> xp.s >= 1500
                 AchievementCatalog.BOSS_SLAIN -> bossCount >= 1
+                AchievementCatalog.BOSS_3 -> bossCount >= 3
                 AchievementCatalog.LEVEL_10 -> level >= 10
+                AchievementCatalog.LEVEL_20 -> level >= 20
+                AchievementCatalog.LEVEL_35 -> level >= 35
+                AchievementCatalog.LEVEL_50 -> level >= 50
+                AchievementCatalog.TWENTYFIVE_WORKOUTS -> workoutCount >= 25
+                AchievementCatalog.STREAK_14 -> longest >= 14
+                AchievementCatalog.PULLUP_15 -> pullupBest >= 15
+                AchievementCatalog.ENDURANCE_2000 -> xp.e >= 2000
+                AchievementCatalog.MOBILITY_1000 -> xp.m >= 1000
+                AchievementCatalog.SLEEP_8 -> maxSleep >= 8.0
+                AchievementCatalog.WAIST_MINUS_10 -> waistDelta >= 10.0
                 else -> false
             }
             if (ok) {
@@ -322,6 +336,12 @@ class Repository(private val db: AppDatabase) {
         waterDao.upsert(WaterEntity(Dates.todayEpochDay(), ml.coerceAtLeast(0)))
     }
 
+    // ─────────────────────────── Sleep ───────────────────────────
+    suspend fun setSleepToday(hours: Double): List<AchievementDef> {
+        sleepDao.upsert(SleepEntity(Dates.todayEpochDay(), hours.coerceIn(0.0, 24.0)))
+        return evaluateAchievements()
+    }
+
     // ─────────────────────────── Settings ───────────────────────────
     suspend fun updateSettings(settings: SettingsEntity) = settingsDao.upsert(settings)
 
@@ -333,6 +353,7 @@ class Repository(private val db: AppDatabase) {
         measurementDao.clear()
         prDao.clear()
         waterDao.clear()
+        sleepDao.clear()
         achievementDao.relockAll()
         streakDao.upsert(StreakEntity())
         // Сохраняем текущий замер как новую точку отсчёта
@@ -365,6 +386,7 @@ class Repository(private val db: AppDatabase) {
             streak = streakDao.get(),
             settings = settingsDao.get(),
             water = waterDao.allOnce(),
+            sleep = sleepDao.allOnce(),
         )
         return BackupSerializer.export(data)
     }
@@ -378,6 +400,7 @@ class Repository(private val db: AppDatabase) {
         measurementDao.clear()
         prDao.clear()
         waterDao.clear()
+        sleepDao.clear()
 
         data.profile?.let { profileDao.upsert(it) }
         data.measurements.forEach { measurementDao.insert(it.copy(id = 0)) }
@@ -387,6 +410,7 @@ class Repository(private val db: AppDatabase) {
         if (data.prs.isNotEmpty()) prDao.upsertAll(data.prs)
         if (data.achievements.isNotEmpty()) achievementDao.upsertAll(data.achievements)
         if (data.water.isNotEmpty()) waterDao.upsertAll(data.water)
+        if (data.sleep.isNotEmpty()) sleepDao.upsertAll(data.sleep)
         data.streak?.let { streakDao.upsert(it) }
         data.settings?.let { settingsDao.upsert(it) }
     }

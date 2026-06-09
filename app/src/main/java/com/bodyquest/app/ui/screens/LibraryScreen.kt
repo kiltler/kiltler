@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircle
@@ -16,6 +18,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,9 +32,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.Equipment
 import com.bodyquest.app.domain.seed.ExerciseCatalog
+import com.bodyquest.app.ui.art.ExercisePoseView
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.openTechniqueVideo
+import com.bodyquest.app.ui.theme.BqSurfaceVariant
 
 @Composable
 fun LibraryScreen() {
@@ -58,7 +63,19 @@ fun LibraryScreen() {
 
         exercises.forEach { ex ->
             BqCard(Modifier.fillMaxWidth()) {
-                Text(ex.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Surface(
+                    color = BqSurfaceVariant,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(150.dp),
+                ) {
+                    ExercisePoseView(
+                        exerciseId = ex.id,
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        accent = Color(ex.attribute.colorArgb),
+                    )
+                }
+                Text(ex.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp))
                 Text("${ex.attribute.emoji} ${ex.attribute.title} · ${ex.muscles.joinToString { it.title }}",
                     style = MaterialTheme.typography.labelMedium, color = Color(ex.attribute.colorArgb))
                 Text(ex.instructions, style = MaterialTheme.typography.bodyMedium,

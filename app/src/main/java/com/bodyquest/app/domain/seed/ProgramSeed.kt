@@ -110,13 +110,15 @@ object ProgramSeed {
         ),
     )
 
-    private val weeklyBoss = WorkoutDay(
-        id = "boss_weekly",
-        title = "БОСС НЕДЕЛИ — «Кузница V»",
-        focus = "Круговой челлендж на всё тело. 5 кругов без отдыха внутри круга.",
+    private val bossForge = WorkoutDay(
+        id = "boss_forge",
+        title = "БОСС — «Кузница V»",
+        focus = "Круговой челлендж на всё тело. 5 кругов, отдых только между кругами.",
         emphasis = listOf(AttributeType.ENDURANCE, AttributeType.STRENGTH, AttributeType.DISCIPLINE),
         warmup = standardWarmup,
         isBoss = true,
+        portrait = "🗿",
+        bossSubtitle = "Каменный страж V-силуэта",
         exercises = listOf(
             PlannedExercise("kb_swing", 5, "20", 0, "Круг 1/5 → 5/5"),
             PlannedExercise("pullup", 5, "макс.", 0),
@@ -125,6 +127,58 @@ object ProgramSeed {
             PlannedExercise("plank", 5, "60 сек", 120, "Отдых 2 мин МЕЖДУ кругами"),
         ),
     )
+
+    private val bossApe = WorkoutDay(
+        id = "boss_ape",
+        title = "БОСС — «Турникмен»",
+        focus = "Тяги и жимы на турнике. 6 кругов на спину, грудь и руки.",
+        emphasis = listOf(AttributeType.STRENGTH, AttributeType.DISCIPLINE),
+        warmup = standardWarmup,
+        isBoss = true,
+        portrait = "🦍",
+        bossSubtitle = "Царь турника",
+        exercises = listOf(
+            PlannedExercise("pullup", 6, "макс.", 0, "Круг 1/6 → 6/6"),
+            PlannedExercise("dips", 6, "макс.", 0),
+            PlannedExercise("hanging_leg_raise", 6, "12", 0),
+            PlannedExercise("face_pull", 6, "20", 90, "Отдых 90 сек между кругами"),
+        ),
+    )
+
+    private val bossStorm = WorkoutDay(
+        id = "boss_storm",
+        title = "БОСС — «Гиревой шторм»",
+        focus = "10 минут непрерывной работы с гирей. На время, без остановок.",
+        emphasis = listOf(AttributeType.ENDURANCE, AttributeType.STRENGTH),
+        warmup = standardWarmup,
+        isBoss = true,
+        portrait = "🌪️",
+        bossSubtitle = "Буря из 32 кг",
+        exercises = listOf(
+            PlannedExercise("kb_snatch", 5, "10 на руку", 0, "Меняй руки без отдыха"),
+            PlannedExercise("kb_clean", 5, "10 на руку", 0),
+            PlannedExercise("kb_swing", 5, "25", 60, "Отдых 60 сек между блоками"),
+        ),
+    )
+
+    private val bossInferno = WorkoutDay(
+        id = "boss_inferno",
+        title = "БОСС — «Адское пламя»",
+        focus = "Жиросжигающий ад: 7 кругов отжиманий, приседов и планки.",
+        emphasis = listOf(AttributeType.ENDURANCE, AttributeType.DISCIPLINE),
+        warmup = standardWarmup,
+        isBoss = true,
+        portrait = "🔥",
+        bossSubtitle = "Пожиратель жира",
+        exercises = listOf(
+            PlannedExercise("pushup", 7, "макс.", 0, "Круг 1/7 → 7/7"),
+            PlannedExercise("kb_goblet_squat", 7, "15", 0),
+            PlannedExercise("kb_swing", 7, "20", 0),
+            PlannedExercise("plank", 7, "45 сек", 75),
+        ),
+    )
+
+    private val allBosses = listOf(bossForge, bossApe, bossStorm, bossInferno)
 
     private val commonNotes = listOf(
         "Прогрессия: как только выполняете верх диапазона повторов во всех подходах — добавьте вес/повтор или усложните вариант.",
@@ -139,14 +193,14 @@ object ProgramSeed {
             name = "V-Forge 4× (рекомпозиция)",
             daysPerWeek = 4,
             days = listOf(day4Pull, day4Push, day4Legs, day4Shoulders),
-            boss = weeklyBoss,
+            bosses = allBosses,
             notes = commonNotes,
         )
         else -> Program(
             name = "V-Forge 3× (рекомпозиция)",
             daysPerWeek = 3,
             days = listOf(day3Pull, day3Push, day3Legs),
-            boss = weeklyBoss,
+            bosses = allBosses,
             notes = commonNotes,
         )
     }

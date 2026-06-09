@@ -14,6 +14,7 @@ data class BackupData(
     val streak: StreakEntity?,
     val settings: SettingsEntity?,
     val water: List<WaterEntity>,
+    val sleep: List<SleepEntity>,
 )
 
 /**
@@ -113,6 +114,12 @@ object BackupSerializer {
             }
         })
 
+        root.put("sleep", JSONArray().apply {
+            data.sleep.forEach { s ->
+                put(JSONObject().apply { put("dateEpochDay", s.dateEpochDay); put("hours", s.hours) })
+            }
+        })
+
         return root.toString()
     }
 
@@ -197,7 +204,11 @@ object BackupSerializer {
             WaterEntity(dateEpochDay = w.optLong("dateEpochDay", 0), amountMl = w.optInt("amountMl", 0))
         }
 
-        return BackupData(profile, measurements, sessions, sets, prs, achievements, streak, settings, water)
+        val sleep = root.optJSONArray("sleep").mapObjects { s ->
+            SleepEntity(dateEpochDay = s.optLong("dateEpochDay", 0), hours = s.optDouble("hours", 0.0))
+        }
+
+        return BackupData(profile, measurements, sessions, sets, prs, achievements, streak, settings, water, sleep)
     }
 
     private inline fun <T> JSONArray?.mapObjects(transform: (JSONObject) -> T): List<T> {

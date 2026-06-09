@@ -10,6 +10,7 @@ import com.bodyquest.app.data.ExercisePrEntity
 import com.bodyquest.app.data.MeasurementEntity
 import com.bodyquest.app.data.Repository
 import com.bodyquest.app.data.SettingsEntity
+import com.bodyquest.app.data.SleepEntity
 import com.bodyquest.app.data.StreakEntity
 import com.bodyquest.app.data.UserProfileEntity
 import com.bodyquest.app.data.WaterEntity
@@ -61,11 +62,14 @@ class BodyQuestViewModel(
         val achievements: List<AchievementEntity>,
         val prs: List<ExercisePrEntity>,
         val water: WaterEntity?,
+        val sleep: SleepEntity?,
     )
 
     private val core = combine(repo.profile, repo.xpTotals, repo.compositionXp, ::CoreBundle)
     private val body = combine(repo.latestMeasurement, repo.measurements, repo.streak, ::BodyBundle)
-    private val progress = combine(repo.achievements, repo.prs, repo.waterTodayFlow(), ::ProgressBundle)
+    private val progress = combine(
+        repo.achievements, repo.prs, repo.waterTodayFlow(), repo.sleepTodayFlow(), ::ProgressBundle
+    )
 
     val state: StateFlow<AppUiState> =
         combine(core, body, progress) { c, b, p -> buildState(c, b, p) }
@@ -134,6 +138,7 @@ class BodyQuestViewModel(
             isRestDay = rest,
             nutrition = nutrition,
             waterMl = p.water?.amountMl ?: 0,
+            sleepHours = p.sleep?.hours ?: 0.0,
             achievements = achievements,
             prs = p.prs.associateBy { it.exerciseId },
         )
@@ -141,7 +146,7 @@ class BodyQuestViewModel(
 
     private fun questForToday(program: Program): Pair<WorkoutDay?, Boolean> {
         val dow = LocalDate.now().dayOfWeek
-        if (dow == DayOfWeek.SATURDAY) return program.boss to false
+        if (dow == DayOfWeek.SATURDAY) return program.bossForWeek(LocalDate.now().dayOfYear / 7) to false
         val map = if (program.daysPerWeek == 4) {
             mapOf(
                 DayOfWeek.MONDAY to 0,
@@ -205,6 +210,10 @@ class BodyQuestViewModel(
 
     fun setWater(ml: Int) {
         viewModelScope.launch { repo.setWaterToday(ml) }
+    }
+
+    fun setSleep(hours: Double) {
+        viewModelScope.launch { repo.setSleepToday(hours) }
     }
 
     fun setWorkoutReminder(enabled: Boolean, hour: Int, minute: Int) {

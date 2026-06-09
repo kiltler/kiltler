@@ -63,6 +63,8 @@ data class WorkoutDay(
     val warmup: List<String>,
     val exercises: List<PlannedExercise>,
     val isBoss: Boolean = false,
+    val portrait: String = "",       // эмодзи-«портрет» босса
+    val bossSubtitle: String = "",   // короткое описание босса
 )
 
 /** Недельная программа. */
@@ -70,6 +72,10 @@ data class Program(
     val name: String,
     val daysPerWeek: Int,
     val days: List<WorkoutDay>,
-    val boss: WorkoutDay,
+    val bosses: List<WorkoutDay>,
     val notes: List<String>,
-)
+) {
+    /** Босс этой недели — ротация по номеру недели года. */
+    fun bossForWeek(weekOfYear: Int): WorkoutDay =
+        bosses[((weekOfYear % bosses.size) + bosses.size) % bosses.size]
+}
