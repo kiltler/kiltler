@@ -1,12 +1,17 @@
 package com.bodyquest.app.ui.art
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 
 /** Тип позы для схематичной иллюстрации техники. */
 enum class ExercisePose {
@@ -247,3 +252,32 @@ fun ExercisePoseView(
     val def = poseFor(exerciseId)
     Canvas(modifier) { drawPose(poseDef(def), color, accent) }
 }
+
+/**
+ * Иллюстрация упражнения. Если в res/drawable есть файл `ex_<id>` (png/webp/jpg/xml),
+ * показываем его. Иначе — рисуем схематичный силуэт (ExercisePoseView) как запасной вариант.
+ * Это позволяет добавлять готовые картинки техники, просто кладя файлы в drawable.
+ */
+@Composable
+fun ExerciseImage(
+    exerciseId: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFFB9C0DA),
+    accent: Color = Color(0xFFFFB454),
+) {
+    val context = LocalContext.current
+    val resId = remember(exerciseId) {
+        context.resources.getIdentifier("ex_$exerciseId", "drawable", context.packageName)
+    }
+    if (resId != 0) {
+        Image(
+            painter = painterResource(id = resId),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = modifier,
+        )
+    } else {
+        ExercisePoseView(exerciseId, modifier, color, accent)
+    }
+}
+

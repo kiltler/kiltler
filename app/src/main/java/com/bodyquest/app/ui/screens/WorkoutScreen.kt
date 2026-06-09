@@ -41,7 +41,7 @@ import com.bodyquest.app.domain.PlannedExercise
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.seed.ExerciseCatalog
 import com.bodyquest.app.ui.AppUiState
-import com.bodyquest.app.ui.art.ExercisePoseView
+import com.bodyquest.app.ui.art.ExerciseImage
 import com.bodyquest.app.ui.openTechniqueVideo
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.SectionTitle
@@ -172,7 +172,7 @@ private fun ExerciseBlock(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.size(64.dp),
             ) {
-                ExercisePoseView(
+                ExerciseImage(
                     exerciseId = planned.exerciseId,
                     modifier = Modifier.size(64.dp).padding(6.dp),
                 )

@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.Equipment
 import com.bodyquest.app.domain.seed.ExerciseCatalog
-import com.bodyquest.app.ui.art.ExercisePoseView
+import com.bodyquest.app.ui.art.ExerciseImage
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.openTechniqueVideo
@@ -68,7 +68,7 @@ fun LibraryScreen() {
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(150.dp),
                 ) {
-                    ExercisePoseView(
+                    ExerciseImage(
                         exerciseId = ex.id,
                         modifier = Modifier.fillMaxWidth().padding(12.dp),
                         accent = Color(ex.attribute.colorArgb),
