@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -26,6 +30,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.ExerciseType
@@ -34,6 +39,7 @@ import com.bodyquest.app.domain.PlannedExercise
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.seed.ExerciseCatalog
 import com.bodyquest.app.ui.AppUiState
+import com.bodyquest.app.ui.openTechniqueVideo
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.theme.BqSecondary
@@ -153,8 +159,16 @@ private fun ExerciseBlock(
     onAddSet: () -> Unit,
 ) {
     val ex = ExerciseCatalog.get(planned.exerciseId)
+    val context = LocalContext.current
     BqCard(Modifier.fillMaxWidth()) {
-        Text(ex?.name ?: planned.exerciseId, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(ex?.name ?: planned.exerciseId, style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            IconButton(onClick = { openTechniqueVideo(context, ex?.name ?: planned.exerciseId) }) {
+                Icon(Icons.Filled.PlayCircle, contentDescription = "Видео техники", tint = BqSecondary)
+            }
+        }
         Text("${planned.sets} × ${planned.targetReps}", style = MaterialTheme.typography.bodyMedium, color = BqSecondary)
         if (planned.note.isNotBlank()) {
             Text(planned.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

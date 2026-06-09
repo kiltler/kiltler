@@ -1,5 +1,8 @@
 package com.bodyquest.app.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,8 +46,17 @@ fun ProfileScreen(
     onLogMeasurement: (Double, Double, Double, Double, Double, Double, Double, Double, Double) -> Unit,
     onWorkoutReminder: (Boolean, Int, Int) -> Unit,
     onWaterReminder: (Boolean) -> Unit,
+    onExport: (Uri) -> Unit,
+    onImport: (Uri) -> Unit,
     onReset: () -> Unit,
 ) {
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let(onExport) }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let(onImport) }
+
     val profile = state.profile ?: return
     val latest = state.latest
 
@@ -165,8 +177,24 @@ fun ProfileScreen(
         }
 
         BqCard(Modifier.fillMaxWidth()) {
+            SectionTitle("Резервная копия прогресса")
+            Text("Сохрани прогресс в файл и положи его в любое облако (Google Drive и т.п.). " +
+                "После переустановки — импортируй обратно.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(
+                onClick = { exportLauncher.launch("bodyquest_backup.json") },
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            ) { Text("Экспорт прогресса в файл") }
+            OutlinedButton(
+                onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) { Text("Импорт прогресса из файла") }
+        }
+
+        BqCard(Modifier.fillMaxWidth()) {
             SectionTitle("Данные")
-            Text("Всё хранится только на телефоне (Room). Без сети, аккаунтов и облака.",
+            Text("Всё хранится локально (Room). Google Auto Backup автоматически бэкапит базу " +
+                "на твой аккаунт и восстанавливает её при переустановке.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedButton(
                 onClick = { showReset = true },

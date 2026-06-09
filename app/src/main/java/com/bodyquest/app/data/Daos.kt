@@ -50,6 +50,9 @@ interface MeasurementDao {
     @Query("SELECT COALESCE(SUM(xpComposition), 0) FROM measurement_log")
     suspend fun compositionXp(): Int
 
+    @Query("SELECT * FROM measurement_log")
+    suspend fun allOnce(): List<MeasurementEntity>
+
     @Insert
     suspend fun insert(measurement: MeasurementEntity): Long
 
@@ -83,8 +86,17 @@ interface WorkoutDao {
     )
     suspend fun xpTotals(): WorkoutXpTotals
 
+    @Query("SELECT * FROM workout_session")
+    suspend fun allSessionsOnce(): List<WorkoutSessionEntity>
+
+    @Query("SELECT * FROM set_log")
+    suspend fun allSetsOnce(): List<SetEntity>
+
     @Insert
     suspend fun insertSession(session: WorkoutSessionEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSessionRestore(session: WorkoutSessionEntity)
 
     @Insert
     suspend fun insertSets(sets: List<SetEntity>)
@@ -107,8 +119,14 @@ interface PrDao {
     @Query("SELECT * FROM exercise_pr WHERE exerciseId = :id")
     suspend fun get(id: String): ExercisePrEntity?
 
+    @Query("SELECT * FROM exercise_pr")
+    suspend fun allOnce(): List<ExercisePrEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(pr: ExercisePrEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(prs: List<ExercisePrEntity>)
 
     @Query("DELETE FROM exercise_pr")
     suspend fun clear()
@@ -122,8 +140,14 @@ interface AchievementDao {
     @Query("SELECT * FROM achievement WHERE unlocked = 0")
     suspend fun locked(): List<AchievementEntity>
 
+    @Query("SELECT * FROM achievement")
+    suspend fun allOnce(): List<AchievementEntity>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(items: List<AchievementEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(items: List<AchievementEntity>)
 
     @Update
     suspend fun update(item: AchievementEntity)
@@ -164,8 +188,14 @@ interface WaterDao {
     @Query("SELECT * FROM water_log WHERE dateEpochDay = :day")
     suspend fun forDay(day: Long): WaterEntity?
 
+    @Query("SELECT * FROM water_log")
+    suspend fun allOnce(): List<WaterEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(water: WaterEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(items: List<WaterEntity>)
 
     @Query("DELETE FROM water_log")
     suspend fun clear()

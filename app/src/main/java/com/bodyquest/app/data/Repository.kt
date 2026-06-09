@@ -352,4 +352,42 @@ class Repository(private val db: AppDatabase) {
         val xp = workoutDao.xpTotals()
         return xp.s + xp.e + xp.m + xp.d + measurementDao.compositionXp()
     }
+
+    // ─────────────────────────── Backup ───────────────────────────
+    suspend fun exportJson(): String {
+        val data = BackupData(
+            profile = profileDao.get(),
+            measurements = measurementDao.allOnce(),
+            sessions = workoutDao.allSessionsOnce(),
+            sets = workoutDao.allSetsOnce(),
+            prs = prDao.allOnce(),
+            achievements = achievementDao.allOnce(),
+            streak = streakDao.get(),
+            settings = settingsDao.get(),
+            water = waterDao.allOnce(),
+        )
+        return BackupSerializer.export(data)
+    }
+
+    suspend fun importJson(json: String) {
+        val data = BackupSerializer.parse(json)
+        seedIfNeeded()
+
+        // Полностью заменяем прогресс данными из бэкапа
+        workoutDao.clearSessions() // каскадно удалит подходы
+        measurementDao.clear()
+        prDao.clear()
+        waterDao.clear()
+
+        data.profile?.let { profileDao.upsert(it) }
+        data.measurements.forEach { measurementDao.insert(it.copy(id = 0)) }
+        // Сессии восстанавливаем с исходными id, чтобы совпали внешние ключи подходов
+        data.sessions.forEach { workoutDao.insertSessionRestore(it) }
+        if (data.sets.isNotEmpty()) workoutDao.insertSets(data.sets)
+        if (data.prs.isNotEmpty()) prDao.upsertAll(data.prs)
+        if (data.achievements.isNotEmpty()) achievementDao.upsertAll(data.achievements)
+        if (data.water.isNotEmpty()) waterDao.upsertAll(data.water)
+        data.streak?.let { streakDao.upsert(it) }
+        data.settings?.let { settingsDao.upsert(it) }
+    }
 }

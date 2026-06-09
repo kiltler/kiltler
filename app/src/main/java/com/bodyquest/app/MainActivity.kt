@@ -35,7 +35,11 @@ class MainActivity : ComponentActivity() {
             BodyQuestTheme {
                 Surface(Modifier.fillMaxSize()) {
                     val vm: BodyQuestViewModel = viewModel(
-                        factory = BodyQuestViewModel.Factory(container.repository, container.reminderScheduler)
+                        factory = BodyQuestViewModel.Factory(
+                            container.repository,
+                            container.reminderScheduler,
+                            applicationContext,
+                        )
                     )
                     BodyQuestRoot(vm, Modifier.systemBarsPadding())
                 }

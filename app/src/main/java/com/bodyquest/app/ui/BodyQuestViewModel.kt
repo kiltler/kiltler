@@ -1,5 +1,7 @@
 package com.bodyquest.app.ui
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -28,16 +30,19 @@ import com.bodyquest.app.notifications.ReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.DayOfWeek
 import java.time.LocalDate
 
 class BodyQuestViewModel(
     private val repo: Repository,
     private val scheduler: ReminderScheduler,
+    private val appContext: Context,
 ) : ViewModel() {
 
     private data class CoreBundle(
@@ -72,6 +77,11 @@ class BodyQuestViewModel(
 
     private val _measurementOutcome = MutableStateFlow<MeasurementOutcome?>(null)
     val measurementOutcome: StateFlow<MeasurementOutcome?> = _measurementOutcome
+
+    // Сообщения для тостов (бэкап и т.п.)
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message
+    fun clearMessage() { _message.value = null }
 
     private fun buildState(c: CoreBundle, b: BodyBundle, p: ProgressBundle): AppUiState {
         val profile = c.profile
@@ -220,12 +230,45 @@ class BodyQuestViewModel(
         viewModelScope.launch { repo.resetProgress() }
     }
 
+    fun exportBackup(uri: Uri) {
+        viewModelScope.launch {
+            _message.value = try {
+                withContext(Dispatchers.IO) {
+                    val json = repo.exportJson()
+                    appContext.contentResolver.openOutputStream(uri)?.use {
+                        it.write(json.toByteArray(Charsets.UTF_8))
+                    } ?: error("нет доступа к файлу")
+                }
+                "Прогресс сохранён в файл ✅"
+            } catch (e: Exception) {
+                "Ошибка экспорта: ${e.message}"
+            }
+        }
+    }
+
+    fun importBackup(uri: Uri) {
+        viewModelScope.launch {
+            _message.value = try {
+                withContext(Dispatchers.IO) {
+                    val json = appContext.contentResolver.openInputStream(uri)
+                        ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                        ?: error("не удалось прочитать файл")
+                    repo.importJson(json)
+                }
+                "Прогресс восстановлен ✅"
+            } catch (e: Exception) {
+                "Ошибка импорта: ${e.message}"
+            }
+        }
+    }
+
     class Factory(
         private val repo: Repository,
         private val scheduler: ReminderScheduler,
+        private val appContext: Context,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            BodyQuestViewModel(repo, scheduler) as T
+            BodyQuestViewModel(repo, scheduler, appContext) as T
     }
 }

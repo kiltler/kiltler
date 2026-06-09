@@ -10,13 +10,18 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
+import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -77,6 +82,14 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val workoutOutcome by vm.workoutOutcome.collectAsStateWithLifecycle()
     val measurementOutcome by vm.measurementOutcome.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(message) {
+        message?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            vm.clearMessage()
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -94,7 +107,16 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                             }
                         },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
+                        label = {
+                            Text(
+                                tab.label,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Visible,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        },
+                        alwaysShowLabel = true,
                     )
                 }
             }
@@ -127,6 +149,8 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                         },
                         onWorkoutReminder = vm::setWorkoutReminder,
                         onWaterReminder = vm::setWaterReminder,
+                        onExport = vm::exportBackup,
+                        onImport = vm::importBackup,
                         onReset = vm::resetProgress,
                     )
                 }
