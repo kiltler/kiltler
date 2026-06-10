@@ -104,6 +104,19 @@ class Repository(private val db: AppDatabase) {
 
     suspend fun updateProfile(profile: UserProfileEntity) = profileDao.upsert(profile)
 
+    /** Удаление тренировки — XP/уровни/радар пересчитываются автоматически (через SUM). */
+    suspend fun deleteSession(id: Long) = workoutDao.deleteSession(id)
+
+    /**
+     * Удаление замера. Не даём удалить последний (нужна хотя бы одна точка отсчёта),
+     * чтобы не сломать расчёт питания и графики.
+     */
+    suspend fun deleteMeasurement(id: Long): Boolean {
+        if (measurementDao.count() <= 1) return false
+        measurementDao.deleteById(id)
+        return true
+    }
+
     // ─────────────────────────── Measurements ───────────────────────────
     suspend fun logMeasurement(
         weightKg: Double,

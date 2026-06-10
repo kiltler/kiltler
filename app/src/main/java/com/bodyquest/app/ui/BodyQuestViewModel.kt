@@ -14,6 +14,7 @@ import com.bodyquest.app.data.SleepEntity
 import com.bodyquest.app.data.StreakEntity
 import com.bodyquest.app.data.UserProfileEntity
 import com.bodyquest.app.data.WaterEntity
+import com.bodyquest.app.data.WorkoutSessionEntity
 import com.bodyquest.app.data.WorkoutXpTotals
 import com.bodyquest.app.domain.ActivityLevel
 import com.bodyquest.app.domain.AttributeType
@@ -56,6 +57,7 @@ class BodyQuestViewModel(
         val latest: MeasurementEntity?,
         val all: List<MeasurementEntity>,
         val streak: StreakEntity?,
+        val sessions: List<WorkoutSessionEntity>,
     )
 
     private data class ProgressBundle(
@@ -66,7 +68,9 @@ class BodyQuestViewModel(
     )
 
     private val core = combine(repo.profile, repo.xpTotals, repo.compositionXp, ::CoreBundle)
-    private val body = combine(repo.latestMeasurement, repo.measurements, repo.streak, ::BodyBundle)
+    private val body = combine(
+        repo.latestMeasurement, repo.measurements, repo.streak, repo.sessions, ::BodyBundle
+    )
     private val progress = combine(
         repo.achievements, repo.prs, repo.waterTodayFlow(), repo.sleepTodayFlow(), ::ProgressBundle
     )
@@ -132,6 +136,7 @@ class BodyQuestViewModel(
             latest = b.latest,
             first = b.all.firstOrNull(),
             measurements = b.all,
+            sessions = b.sessions,
             streak = b.streak,
             program = program,
             todayQuest = todayQuest,
@@ -237,6 +242,21 @@ class BodyQuestViewModel(
 
     fun resetProgress() {
         viewModelScope.launch { repo.resetProgress() }
+    }
+
+    fun deleteSession(id: Long) {
+        viewModelScope.launch {
+            repo.deleteSession(id)
+            _message.value = "Тренировка удалена"
+        }
+    }
+
+    fun deleteMeasurement(id: Long) {
+        viewModelScope.launch {
+            _message.value =
+                if (repo.deleteMeasurement(id)) "Замер удалён"
+                else "Нельзя удалить единственный замер"
+        }
     }
 
     fun exportBackup(uri: Uri) {

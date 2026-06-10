@@ -56,6 +56,12 @@ interface MeasurementDao {
     @Insert
     suspend fun insert(measurement: MeasurementEntity): Long
 
+    @Query("DELETE FROM measurement_log WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("SELECT COUNT(*) FROM measurement_log")
+    suspend fun count(): Int
+
     @Query("DELETE FROM measurement_log")
     suspend fun clear()
 }
@@ -106,6 +112,9 @@ interface WorkoutDao {
 
     @Query("SELECT * FROM set_log WHERE exerciseId = :exerciseId ORDER BY dateMillis ASC")
     fun flowSetsFor(exerciseId: String): Flow<List<SetEntity>>
+
+    @Query("DELETE FROM workout_session WHERE id = :id")
+    suspend fun deleteSession(id: Long)
 
     @Query("DELETE FROM workout_session")
     suspend fun clearSessions()

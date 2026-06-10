@@ -6,6 +6,7 @@ import com.bodyquest.app.data.MeasurementEntity
 import com.bodyquest.app.data.SetEntity
 import com.bodyquest.app.data.StreakEntity
 import com.bodyquest.app.data.UserProfileEntity
+import com.bodyquest.app.data.WorkoutSessionEntity
 import com.bodyquest.app.domain.AttributeType
 import com.bodyquest.app.domain.LevelProgress
 import com.bodyquest.app.domain.NutritionPlan
@@ -37,6 +38,7 @@ data class AppUiState(
     val latest: MeasurementEntity? = null,
     val first: MeasurementEntity? = null,
     val measurements: List<MeasurementEntity> = emptyList(),
+    val sessions: List<WorkoutSessionEntity> = emptyList(),
     val streak: StreakEntity? = null,
     val program: Program? = null,
     val todayQuest: WorkoutDay? = null,

@@ -57,7 +57,8 @@ abstract class AppDatabase : RoomDatabase() {
                     "bodyquest.db",
                 )
                     .addMigrations(MIGRATION_1_2)
-                    .fallbackToDestructiveMigration()
+                    // НЕ используем fallbackToDestructiveMigration: прогресс не должен
+                    // теряться при обновлении. Каждое изменение схемы — отдельная Migration.
                     .build().also { INSTANCE = it }
             }
     }
