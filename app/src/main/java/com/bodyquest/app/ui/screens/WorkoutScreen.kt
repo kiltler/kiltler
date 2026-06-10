@@ -1,5 +1,12 @@
 package com.bodyquest.app.ui.screens
 
+import android.content.Context
+import android.os.Build
+import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +66,19 @@ private class SetRow(reps: String, weight: String, time: String) {
 private fun upperRepBound(target: String): Int =
     Regex("\\d+").findAll(target).map { it.value.toInt() }.maxOrNull() ?: Int.MAX_VALUE
 
+/** Короткая вибрация по окончании отдыха (разрешение VIBRATE уже в манифесте). */
+private fun vibrate(context: Context) {
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+    }
+    runCatching {
+        vibrator?.vibrate(VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE))
+    }
+}
+
 @Composable
 fun WorkoutScreen(
     day: WorkoutDay,
@@ -66,6 +86,7 @@ fun WorkoutScreen(
     onFinish: (WorkoutDay, List<LoggedSet>, Int) -> Unit,
     onCancel: () -> Unit,
 ) {
+    val context = LocalContext.current
     val startMillis = remember(day.id) { System.currentTimeMillis() }
 
     // Локальное состояние подходов по упражнениям
@@ -78,13 +99,33 @@ fun WorkoutScreen(
         }
     }
 
-    // Таймер отдыха
+    // Таймер отдыха: считаем по «целевому» elapsedRealtime — отсчёт остаётся точным,
+    // даже если кадр пропущен или экран ненадолго погас. По окончании — вибрация.
+    var restEndsAt by remember { mutableStateOf(0L) }
     var restRemaining by remember { mutableIntStateOf(0) }
-    LaunchedEffect(restRemaining) {
-        if (restRemaining > 0) {
-            delay(1000)
-            restRemaining -= 1
+    LaunchedEffect(restEndsAt) {
+        if (restEndsAt > 0L) {
+            while (true) {
+                val left = restEndsAt - SystemClock.elapsedRealtime()
+                if (left <= 0L) {
+                    restRemaining = 0
+                    vibrate(context)
+                    break
+                }
+                restRemaining = ((left + 999L) / 1000L).toInt()
+                delay(200)
+            }
+            restEndsAt = 0L
         }
+    }
+    fun startRest(seconds: Int) {
+        if (seconds <= 0) return
+        restRemaining = seconds
+        restEndsAt = SystemClock.elapsedRealtime() + seconds * 1000L
+    }
+    fun stopRest() {
+        restEndsAt = 0L
+        restRemaining = 0
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -101,11 +142,13 @@ fun WorkoutScreen(
             }
 
             sheets.forEach { (planned, rows) ->
+                val pr = state.prs[planned.exerciseId]
                 ExerciseBlock(
                     planned = planned,
                     rows = rows,
-                    lastTopReps = state.prs[planned.exerciseId]?.lastReps ?: 0,
-                    onRest = { restRemaining = planned.restSeconds.coerceAtLeast(0) },
+                    lastTopReps = pr?.lastReps ?: 0,
+                    lastTopTime = pr?.lastTimeSeconds ?: 0,
+                    onRest = { startRest(planned.restSeconds) },
                     onAddSet = { rows.add(SetRow("", rows.lastOrNull()?.weight ?: "", "")) },
                 )
             }
@@ -125,8 +168,16 @@ fun WorkoutScreen(
                             }
                         }
                     }
-                    val duration = ((System.currentTimeMillis() - startMillis) / 1000).toInt()
-                    onFinish(day, logged, duration)
+                    if (logged.isEmpty()) {
+                        Toast.makeText(
+                            context,
+                            "Залогируй хотя бы один подход, чтобы засчитать тренировку",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    } else {
+                        val duration = ((System.currentTimeMillis() - startMillis) / 1000).toInt()
+                        onFinish(day, logged, duration)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Завершить тренировку", fontWeight = FontWeight.Bold) }
@@ -147,7 +198,7 @@ fun WorkoutScreen(
                 ) {
                     Text("⏱️ Отдых: $restRemaining сек", color = MaterialTheme.colorScheme.onTertiary,
                         fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = { restRemaining = 0 }) { Text("Пропустить") }
+                    TextButton(onClick = { stopRest() }) { Text("Пропустить") }
                 }
             }
         }
@@ -159,11 +210,19 @@ private fun ExerciseBlock(
     planned: PlannedExercise,
     rows: SnapshotStateList<SetRow>,
     lastTopReps: Int,
+    lastTopTime: Int,
     onRest: () -> Unit,
     onAddSet: () -> Unit,
 ) {
     val ex = ExerciseCatalog.get(planned.exerciseId)
     val context = LocalContext.current
+    val isTimed = ex?.type == ExerciseType.TIMED || ex?.type == ExerciseType.MOBILITY
+    val target = upperRepBound(planned.targetReps)
+    val readyToProgress = if (isTimed) {
+        lastTopTime in 1 until Int.MAX_VALUE && lastTopTime >= target
+    } else {
+        lastTopReps in 1 until Int.MAX_VALUE && lastTopReps >= target
+    }
     BqCard(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically) {
@@ -190,9 +249,14 @@ private fun ExerciseBlock(
         if (planned.note.isNotBlank()) {
             Text(planned.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (lastTopReps in 1 until Int.MAX_VALUE && lastTopReps >= upperRepBound(planned.targetReps)) {
-            Text("⬆️ В прошлый раз — $lastTopReps повт. Готов к прокачке: добавь вес или повтор!",
-                style = MaterialTheme.typography.labelLarge, color = BqTertiary, modifier = Modifier.padding(top = 4.dp))
+        if (readyToProgress) {
+            val msg = if (isTimed) {
+                "⬆️ В прошлый раз — $lastTopTime сек. Готов к прокачке: добавь время или усложни!"
+            } else {
+                "⬆️ В прошлый раз — $lastTopReps повт. Готов к прокачке: добавь вес или повтор!"
+            }
+            Text(msg, style = MaterialTheme.typography.labelLarge, color = BqTertiary,
+                modifier = Modifier.padding(top = 4.dp))
         }
 
         val type = ex?.type ?: ExerciseType.BODYWEIGHT_REPS

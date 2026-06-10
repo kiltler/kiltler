@@ -20,6 +20,8 @@ import com.bodyquest.app.data.SetEntity
 import com.bodyquest.app.domain.AttributeType
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.components.BqCard
+import com.bodyquest.app.ui.components.DeletableHistoryRow
+import com.bodyquest.app.ui.components.epochDayLabel
 import com.bodyquest.app.ui.components.LineSeries
 import com.bodyquest.app.ui.components.MultiLineChart
 import com.bodyquest.app.ui.components.SectionTitle
@@ -43,7 +45,7 @@ private fun sessionMaxReps(sets: List<SetEntity>, exerciseId: String): List<Floa
         .map { (_, g) -> g.maxOf { it.reps }.toFloat() }
 
 @Composable
-fun ProgressScreen(state: AppUiState) {
+fun ProgressScreen(state: AppUiState, onDeleteSession: (Long) -> Unit) {
     val m = state.measurements
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -107,6 +109,26 @@ fun ProgressScreen(state: AppUiState) {
                     }
                     XpBar(lp?.fraction ?: 0f, color = Color(attr.colorArgb), height = 8.dp)
                 }
+            }
+        }
+
+        BqCard(Modifier.fillMaxWidth()) {
+            SectionTitle("Журнал тренировок")
+            if (state.sessions.isEmpty()) {
+                Text("Пока нет завершённых тренировок.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                state.sessions.take(20).forEach { s ->
+                    DeletableHistoryRow(
+                        title = s.title,
+                        subtitle = "${epochDayLabel(s.dateEpochDay)} · +${s.totalXp} XP" +
+                            if (s.isBoss) " · 👑 Босс" else "",
+                        onDelete = { onDeleteSession(s.id) },
+                    )
+                }
+                Text("Удаление тренировки пересчитывает XP и уровни.",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp))
             }
         }
     }

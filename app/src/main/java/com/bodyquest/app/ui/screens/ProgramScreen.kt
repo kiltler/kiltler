@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.seed.ExerciseCatalog
 import com.bodyquest.app.ui.AppUiState
+import com.bodyquest.app.ui.art.AssetImageOr
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.theme.BqTertiary
@@ -54,8 +56,13 @@ private fun DayCard(day: WorkoutDay, onStart: (String) -> Unit, accentBoss: Bool
     BqCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (accentBoss && day.portrait.isNotBlank()) {
-                Text(day.portrait, style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(end = 10.dp))
+                AssetImageOr(
+                    name = day.id,
+                    modifier = Modifier.size(40.dp).padding(end = 10.dp),
+                ) {
+                    Text(day.portrait, style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.padding(end = 10.dp))
+                }
             }
             Column {
                 Text(day.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,

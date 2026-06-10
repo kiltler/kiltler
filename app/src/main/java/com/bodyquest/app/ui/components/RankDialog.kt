@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.Rank
-import com.bodyquest.app.ui.art.RankFigure
+import com.bodyquest.app.ui.art.RankArt
 import com.bodyquest.app.ui.theme.BqOutline
 import com.bodyquest.app.ui.theme.BqSurfaceVariant
 import com.bodyquest.app.ui.theme.BqTertiary
@@ -51,7 +51,7 @@ fun RankSystemDialog(currentRank: Rank, onDismiss: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            RankFigure(
+                            RankArt(
                                 rankIndex = rank.index,
                                 modifier = Modifier.size(54.dp).height(64.dp),
                                 color = if (isCurrent) BqTertiary else MaterialTheme.colorScheme.onSurfaceVariant,

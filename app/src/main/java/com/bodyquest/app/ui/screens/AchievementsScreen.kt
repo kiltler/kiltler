@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.ui.AchievementUi
 import com.bodyquest.app.ui.AppUiState
+import com.bodyquest.app.ui.art.AssetImageOr
 import com.bodyquest.app.ui.theme.BqOutline
 import com.bodyquest.app.ui.theme.BqSurface
 import com.bodyquest.app.ui.theme.BqTertiary
@@ -57,10 +59,13 @@ private fun Badge(a: AchievementUi) {
     ) {
         Box(Modifier.padding(12.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    if (unlocked) a.def.emoji else "🔒",
-                    style = MaterialTheme.typography.headlineLarge,
-                )
+                if (unlocked) {
+                    AssetImageOr(name = "ach_${a.def.id}", modifier = Modifier.size(48.dp)) {
+                        Text(a.def.emoji, style = MaterialTheme.typography.headlineLarge)
+                    }
+                } else {
+                    Text("🔒", style = MaterialTheme.typography.headlineLarge)
+                }
                 Text(
                     a.def.name,
                     style = MaterialTheme.typography.titleMedium,

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.AttributeType
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.CharacterState
+import com.bodyquest.app.ui.art.AssetImageOr
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.RadarChart
 import com.bodyquest.app.ui.components.RankSystemDialog
@@ -70,8 +72,11 @@ fun CharacterCard(character: CharacterState) {
 
         // Радар
         val levels = character.attributes.mapValues { it.value.level }
-        val maxCont = character.attributes.values.maxOf { it.level + it.fraction }.coerceAtLeast(1f)
-        val values = character.attributes.mapValues { (it.value.level + it.value.fraction) / maxCont }
+        // Знаменатель с «полом», чтобы на низких уровнях радар был маленьким,
+        // а не полным пятиугольником уже на 1 уровне.
+        val maxCont = character.attributes.values.maxOf { it.level + it.fraction }
+        val denom = maxCont.coerceAtLeast(6f)
+        val values = character.attributes.mapValues { (it.value.level + it.value.fraction) / denom }
         RadarChart(values = values, levels = levels, modifier = Modifier.padding(top = 12.dp),
             rankIndex = character.rank.index)
 
@@ -121,8 +126,13 @@ fun DashboardScreen(
                 if (quest.isBoss) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (quest.portrait.isNotBlank()) {
-                            Text(quest.portrait, style = MaterialTheme.typography.headlineLarge,
-                                modifier = Modifier.padding(end = 8.dp))
+                            AssetImageOr(
+                                name = quest.id,
+                                modifier = Modifier.size(44.dp).padding(end = 8.dp),
+                            ) {
+                                Text(quest.portrait, style = MaterialTheme.typography.headlineLarge,
+                                    modifier = Modifier.padding(end = 8.dp))
+                            }
                         }
                         Text("👑 БОСС НЕДЕЛИ", color = BqTertiary, fontWeight = FontWeight.Black)
                     }

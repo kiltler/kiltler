@@ -33,8 +33,11 @@ import androidx.compose.ui.unit.dp
 import com.bodyquest.app.data.SettingsEntity
 import com.bodyquest.app.data.UserProfileEntity
 import com.bodyquest.app.domain.ActivityLevel
+import com.bodyquest.app.domain.BodyInput
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.components.BqCard
+import com.bodyquest.app.ui.components.DeletableHistoryRow
+import com.bodyquest.app.ui.components.epochDayLabel
 import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.theme.BqDanger
 
@@ -48,6 +51,7 @@ fun ProfileScreen(
     onWaterReminder: (Boolean) -> Unit,
     onExport: (Uri) -> Unit,
     onImport: (Uri) -> Unit,
+    onDeleteMeasurement: (Long) -> Unit,
     onReset: () -> Unit,
 ) {
     val exportLauncher = rememberLauncherForActivityResult(
@@ -113,8 +117,8 @@ fun ProfileScreen(
                     onUpdateProfile(
                         profile.copy(
                             name = name.ifBlank { "Герой" },
-                            heightCm = height.toIntOrNull() ?: profile.heightCm,
-                            age = age.toIntOrNull() ?: profile.age,
+                            heightCm = BodyInput.height(height.toIntOrNull() ?: profile.heightCm),
+                            age = BodyInput.age(age.toIntOrNull() ?: profile.age),
                             daysPerWeek = days,
                             activity = activity.name,
                         )
@@ -144,12 +148,28 @@ fun ProfileScreen(
             Button(
                 onClick = {
                     onLogMeasurement(
-                        d(weight, 97.0), d(chest, 109.0), d(shoulders, 49.0), d(belly, 107.0),
-                        d(waist, 97.0), d(thigh, 66.0), d(hips, 110.0), d(inseam, 90.0), d(foot, 27.0),
+                        BodyInput.weight(d(weight, 97.0)), BodyInput.circumference(d(chest, 109.0)),
+                        BodyInput.shoulders(d(shoulders, 49.0)), BodyInput.circumference(d(belly, 107.0)),
+                        BodyInput.circumference(d(waist, 97.0)), BodyInput.thigh(d(thigh, 66.0)),
+                        BodyInput.circumference(d(hips, 110.0)), BodyInput.inseam(d(inseam, 90.0)),
+                        BodyInput.foot(d(foot, 27.0)),
                     )
                 },
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             ) { Text("Записать замеры (+XP композиции)") }
+        }
+
+        if (state.measurements.isNotEmpty()) {
+            BqCard(Modifier.fillMaxWidth()) {
+                SectionTitle("История замеров")
+                state.measurements.sortedByDescending { it.dateMillis }.take(20).forEach { mm ->
+                    DeletableHistoryRow(
+                        title = "Вес ${mm.weightKg} кг · талия ${mm.waist} см",
+                        subtitle = epochDayLabel(mm.dateEpochDay),
+                        onDelete = { onDeleteMeasurement(mm.id) },
+                    )
+                }
+            }
         }
 
         BqCard(Modifier.fillMaxWidth()) {

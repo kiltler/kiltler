@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import com.bodyquest.app.domain.AttributeType
-import com.bodyquest.app.ui.art.RankFigure
+import com.bodyquest.app.ui.art.RankArt
 import com.bodyquest.app.ui.theme.BqOutline
 import com.bodyquest.app.ui.theme.BqPrimary
 import com.bodyquest.app.ui.theme.BqTertiary
@@ -111,7 +111,7 @@ fun RadarChart(
 
         // Фигура героя в центре, соответствующая рангу
         if (rankIndex != null) {
-            RankFigure(
+            RankArt(
                 rankIndex = rankIndex,
                 modifier = Modifier.fillMaxSize(0.30f),
                 color = fill,

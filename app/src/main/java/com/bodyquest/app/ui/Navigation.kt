@@ -166,7 +166,9 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                 composable(Routes.PROGRAM) {
                     ProgramScreen(state = state, onStartQuest = { navController.navigate("${Routes.WORKOUT}/$it") })
                 }
-                composable(Routes.PROGRESS) { ProgressScreen(state) }
+                composable(Routes.PROGRESS) {
+                    ProgressScreen(state, onDeleteSession = vm::deleteSession)
+                }
                 composable(Routes.NUTRITION) {
                     NutritionScreen(
                         state,
@@ -187,6 +189,7 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                         onWaterReminder = vm::setWaterReminder,
                         onExport = vm::exportBackup,
                         onImport = vm::importBackup,
+                        onDeleteMeasurement = vm::deleteMeasurement,
                         onReset = vm::resetProgress,
                     )
                 }

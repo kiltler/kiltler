@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.ActivityLevel
+import com.bodyquest.app.domain.BodyInput
 import com.bodyquest.app.domain.Equipment
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.SectionTitle
@@ -142,9 +143,13 @@ fun OnboardingScreen(onFinish: (
             onClick = {
                 val activity = if (days >= 4) ActivityLevel.MODERATE else ActivityLevel.LIGHT
                 onFinish(
-                    name.ifBlank { "Герой" }, i(height, 189), i(age, 30), days, activity,
-                    d(weight, 97.0), d(chest, 109.0), d(shoulders, 49.0), d(belly, 107.0),
-                    d(waist, 97.0), d(thigh, 66.0), d(hips, 110.0), d(inseam, 90.0), d(foot, 27.0),
+                    name.ifBlank { "Герой" },
+                    BodyInput.height(i(height, 189)), BodyInput.age(i(age, 30)), days, activity,
+                    BodyInput.weight(d(weight, 97.0)), BodyInput.circumference(d(chest, 109.0)),
+                    BodyInput.shoulders(d(shoulders, 49.0)), BodyInput.circumference(d(belly, 107.0)),
+                    BodyInput.circumference(d(waist, 97.0)), BodyInput.thigh(d(thigh, 66.0)),
+                    BodyInput.circumference(d(hips, 110.0)), BodyInput.inseam(d(inseam, 90.0)),
+                    BodyInput.foot(d(foot, 27.0)),
                 )
             },
             modifier = Modifier.fillMaxWidth(),
