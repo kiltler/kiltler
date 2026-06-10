@@ -15,6 +15,7 @@ import com.bodyquest.app.domain.WorkoutOutcome
 import com.bodyquest.app.domain.WorkoutScoring
 import com.bodyquest.app.domain.seed.AchievementCatalog
 import com.bodyquest.app.domain.seed.AchievementDef
+import com.bodyquest.app.domain.seed.QuickWorkout
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlin.math.max
@@ -55,6 +56,7 @@ class Repository(private val db: AppDatabase) {
     fun waterTodayFlow(): Flow<WaterEntity?> = waterDao.flowForDay(Dates.todayEpochDay())
     fun sleepTodayFlow(): Flow<SleepEntity?> = sleepDao.flowForDay(Dates.todayEpochDay())
 
+    val frozenDays: Flow<List<Long>> = frozenDayDao.flowAll().map { list -> list.map { it.dateEpochDay } }
     val rankUps: Flow<List<RankUpEntity>> = rankUpDao.flowAll()
     val challengeXp: Flow<Int> = challengeDao.flowTotal()
     fun challengeClaimedTodayFlow(): Flow<Boolean> =
@@ -199,10 +201,11 @@ class Repository(private val db: AppDatabase) {
         val longest = max(streak.longest, newStreak)
         val multiplier = Leveling.streakMultiplier(newStreak)
 
-        // XP: базовый → модификатор дня → множитель серии
+        // XP: базовый → модификатор дня → множитель серии → множитель сессии
         val modifier = ModifierEngine.forDay(today)
         val base = WorkoutScoring.baseXp(completed, day.isBoss)
-        val xpByAttr = XpPipeline.apply(base, modifier, multiplier)
+        val sessionFactor = if (day.id == QuickWorkout.ID) XpPipeline.SHORT_SESSION_FACTOR else 1f
+        val xpByAttr = XpPipeline.apply(base, modifier, multiplier, sessionFactor)
         val total = xpByAttr.values.sum()
 
         val oldTotal = totalXpAll()
@@ -402,6 +405,20 @@ class Repository(private val db: AppDatabase) {
         if (s.freezeTokens <= 0) return false
         frozenDayDao.insert(FrozenDayEntity(Dates.todayEpochDay()))
         settingsDao.upsert(s.copy(freezeTokens = s.freezeTokens - 1))
+        return true
+    }
+
+    /**
+     * Ретроспективно заморозить пропущенные дни [days]. Списывает по токену за каждый
+     * НОВЫЙ замороженный день (повторный тот же день не списывает второй токен).
+     */
+    suspend fun applyRetroFreeze(days: List<Long>): Boolean {
+        val s = settingsDao.get() ?: return false
+        val alreadyFrozen = frozenDayDao.allDays().toSet()
+        val toFreeze = days.filter { it !in alreadyFrozen }.distinct()
+        if (toFreeze.isEmpty() || toFreeze.size > s.freezeTokens) return false
+        toFreeze.forEach { frozenDayDao.insert(FrozenDayEntity(it)) }
+        settingsDao.upsert(s.copy(freezeTokens = s.freezeTokens - toFreeze.size))
         return true
     }
 

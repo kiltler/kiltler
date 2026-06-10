@@ -1,7 +1,5 @@
 package com.bodyquest.app.domain
 
-import kotlin.math.abs
-
 object PlateauDetector {
 
     /**
@@ -24,19 +22,22 @@ object PlateauDetector {
     }
 
     /**
-     * Застой веса тела: за последние [weeks] недель разброс ≤ [tolerance] кг.
-     * [weights] — (epochDay, weightKg). Нужно ≥ 2 точек в окне.
+     * Застой веса тела: оценивается по НАКЛОНУ тренда (МНК), а не по разнице двух точек —
+     * так шум от воды/еды не даёт ложных срабатываний.
+     * Плато = за последние [weeks] недель достаточно точек ([minPoints]) и наклон близок к нулю
+     * (|кг/нед| < [flatPerWeek]). Мало точек → не флагуем (молчим, а не тревожим зря).
      */
     fun isWeightStall(
         weights: List<Pair<Long, Double>>,
         today: Long,
         weeks: Int = 3,
-        tolerance: Double = 0.5,
+        flatPerWeek: Double = 0.07,
+        minPoints: Int = 4,
     ): Boolean {
         val cutoff = today - weeks * 7L
         val window = weights.filter { it.first >= cutoff }
-        if (window.size < 2) return false
-        val values = window.map { it.second }
-        return abs(values.max() - values.min()) <= tolerance
+        if (window.size < minPoints) return false
+        val forecast = ForecastEngine.fit(window, flatPerWeek) ?: return false
+        return forecast.direction == 0 // близкий к нулю наклон при достаточном числе точек
     }
 }

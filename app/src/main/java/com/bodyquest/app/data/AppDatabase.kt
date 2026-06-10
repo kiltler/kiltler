@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.bodyquest.app.domain.SchemaContract
 
 @Database(
     entities = [
@@ -24,7 +25,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FrozenDayEntity::class,
     ],
     version = 4,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun profileDao(): ProfileDao
@@ -72,15 +73,13 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /** v3 → v4: заморозки серии (токены + замороженные дни) и цель замеров. */
-        private val MIGRATION_3_4 = object : Migration(3, 4) {
+        val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE `settings` ADD COLUMN `freezeTokens` INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE `settings` ADD COLUMN `targetWaist` REAL NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE `settings` ADD COLUMN `targetBelly` REAL NOT NULL DEFAULT 0")
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `frozen_day` " +
-                        "(`dateEpochDay` INTEGER NOT NULL, PRIMARY KEY(`dateEpochDay`))"
-                )
+                // SQL и @ColumnInfo(defaultValue) берут DEFAULT из одного SchemaContract — не разойдутся.
+                db.execSQL(SchemaContract.ALTER_FREEZE_TOKENS)
+                db.execSQL(SchemaContract.ALTER_TARGET_WAIST)
+                db.execSQL(SchemaContract.ALTER_TARGET_BELLY)
+                db.execSQL(SchemaContract.CREATE_FROZEN_DAY)
             }
         }
 

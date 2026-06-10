@@ -77,8 +77,9 @@ class PlateauDetectorTest {
     }
 
     @Test fun bodyweightStall() {
-        val w = listOf(80L to 90.0, 88L to 90.3, 99L to 90.1)
-        assertTrue(PlateauDetector.isWeightStall(w, today = 100, weeks = 3, tolerance = 0.5))
+        // плоский тренд с достаточным числом точек → плато (по наклону, не по разнице двух точек)
+        val w = listOf(80L to 90.0, 86L to 90.3, 92L to 90.1, 99L to 90.15)
+        assertTrue(PlateauDetector.isWeightStall(w, today = 100))
     }
 }
 

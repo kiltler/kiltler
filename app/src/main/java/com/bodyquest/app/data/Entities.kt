@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.bodyquest.app.domain.SchemaContract
 
 @Entity(tableName = "user_profile")
 data class UserProfileEntity(
@@ -111,9 +112,9 @@ data class SettingsEntity(
     val reminderHour: Int = 18,
     val reminderMinute: Int = 30,
     val waterRemindersEnabled: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val freezeTokens: Int = 0,
-    @ColumnInfo(defaultValue = "0") val targetWaist: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val targetBelly: Double = 0.0,
+    @ColumnInfo(defaultValue = SchemaContract.SETTINGS_DEFAULT) val freezeTokens: Int = 0,
+    @ColumnInfo(defaultValue = SchemaContract.SETTINGS_DEFAULT) val targetWaist: Double = 0.0,
+    @ColumnInfo(defaultValue = SchemaContract.SETTINGS_DEFAULT) val targetBelly: Double = 0.0,
 )
 
 /** День, «замороженный» токеном серии — не рвёт streak. */

@@ -36,12 +36,20 @@ object ModifierEngine {
  * Обнулённые модификатором характеристики дают 0 в этот день.
  */
 object XpPipeline {
+    /** Понижающий коэффициент XP для короткой сессии (H1), чтобы полная программа оставалась ценнее. */
+    const val SHORT_SESSION_FACTOR = 0.5f
+
+    /**
+     * Порядок: базовый XP → модификатор дня → множитель серии → множитель сессии.
+     * [sessionFactor] = 1.0 для обычной тренировки, < 1.0 для короткой.
+     */
     fun apply(
         base: Map<AttributeType, Int>,
         modifier: DayModifier,
         streakMultiplier: Float,
+        sessionFactor: Float = 1f,
     ): Map<AttributeType, Int> = base.mapValues { (attr, v) ->
         if (attr in modifier.zeroAttrs) 0
-        else (v * modifier.mult(attr) * streakMultiplier).roundToInt()
+        else (v * modifier.mult(attr) * streakMultiplier * sessionFactor).roundToInt()
     }
 }

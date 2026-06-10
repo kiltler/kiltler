@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.style.TextOverflow
 import android.widget.Toast
 import androidx.compose.runtime.Composable
@@ -246,6 +248,24 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
             workoutOutcome?.let { WorkoutRewardDialog(it, onDismiss = vm::clearWorkoutOutcome) }
             measurementOutcome?.let { MeasurementRewardDialog(it, onDismiss = vm::clearMeasurementOutcome) }
             if (showConfetti) ConfettiOverlay(onDone = { showConfetti = false })
+
+            val retroOffer by vm.retroFreezeOffer.collectAsStateWithLifecycle()
+            if (retroOffer.isNotEmpty()) {
+                AlertDialog(
+                    onDismissRequest = { vm.dismissRetroFreeze() },
+                    confirmButton = {
+                        TextButton(onClick = { vm.applyRetroFreeze(retroOffer) }) { Text("Заморозить") }
+                    },
+                    dismissButton = { TextButton(onClick = { vm.dismissRetroFreeze() }) { Text("Не сейчас") } },
+                    title = { Text("Серия под угрозой") },
+                    text = {
+                        Text(
+                            "Пропущено дней: ${retroOffer.size}. Потратить ${retroOffer.size} " +
+                                "заморозк(у/и) (есть ${state.freezeTokens}), чтобы сохранить серию?",
+                        )
+                    },
+                )
+            }
         }
     }
 }

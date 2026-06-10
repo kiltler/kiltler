@@ -5,6 +5,11 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Экспорт схемы Room (нужен для MigrationTestHelper и контроля изменений схемы).
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
     namespace = "com.bodyquest.app"
     compileSdk = 35
@@ -16,7 +21,11 @@ android {
         versionCode = 1
         versionName = "1.0"
         vectorDrawables { useSupportLibrary = true }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+
+    // Схемы Room доступны инструментальным тестам как assets.
+    sourceSets["androidTest"].assets.srcDir("$projectDir/schemas")
 
     buildTypes {
         release {
@@ -67,6 +76,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

@@ -22,8 +22,10 @@ import com.bodyquest.app.domain.AttributeType
 import com.bodyquest.app.domain.Leveling
 import com.bodyquest.app.domain.LoggedSet
 import com.bodyquest.app.domain.MeasurementOutcome
+import com.bodyquest.app.domain.Dates
 import com.bodyquest.app.domain.NutritionCalculator
 import com.bodyquest.app.domain.Program
+import com.bodyquest.app.domain.RetroFreeze
 import com.bodyquest.app.domain.Rank
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.WorkoutOutcome
@@ -101,6 +103,30 @@ class BodyQuestViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
     fun clearMessage() { _message.value = null }
+
+    // Ретроспективная заморозка серии: предложение при заходе после пропуска
+    private val _retroDismissed = MutableStateFlow(false)
+    val retroFreezeOffer: StateFlow<List<Long>> = combine(
+        repo.streak, repo.settings, repo.frozenDays, _retroDismissed,
+    ) { s, set, frozen, dismissed ->
+        if (dismissed) emptyList()
+        else RetroFreeze.offer(
+            lastWorkoutEpochDay = s?.lastWorkoutEpochDay ?: -1,
+            currentStreak = s?.current ?: 0,
+            today = Dates.todayEpochDay(),
+            frozen = frozen.toSet(),
+            tokens = set?.freezeTokens ?: 0,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun applyRetroFreeze(days: List<Long>) {
+        viewModelScope.launch {
+            _message.value = if (repo.applyRetroFreeze(days)) "Серия спасена ❄️" else "Не удалось заморозить"
+            _retroDismissed.value = true
+        }
+    }
+
+    fun dismissRetroFreeze() { _retroDismissed.value = true }
 
     private fun buildState(c: CoreBundle, b: BodyBundle, p: ProgressBundle): AppUiState {
         val profile = c.profile
