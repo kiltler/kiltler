@@ -5,12 +5,14 @@ import com.bodyquest.app.domain.Dates
 import com.bodyquest.app.domain.Leveling
 import com.bodyquest.app.domain.LoggedSet
 import com.bodyquest.app.domain.MeasurementOutcome
+import com.bodyquest.app.domain.Rank
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.WorkoutOutcome
 import com.bodyquest.app.domain.WorkoutScoring
 import com.bodyquest.app.domain.seed.AchievementCatalog
 import com.bodyquest.app.domain.seed.AchievementDef
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -28,6 +30,8 @@ class Repository(private val db: AppDatabase) {
     private val settingsDao = db.settingsDao()
     private val waterDao = db.waterDao()
     private val sleepDao = db.sleepDao()
+    private val rankUpDao = db.rankUpDao()
+    private val challengeDao = db.challengeDao()
 
     // ─────────────────────────── Flows ───────────────────────────
     val profile: Flow<UserProfileEntity?> = profileDao.flow()
@@ -45,6 +49,11 @@ class Repository(private val db: AppDatabase) {
 
     fun waterTodayFlow(): Flow<WaterEntity?> = waterDao.flowForDay(Dates.todayEpochDay())
     fun sleepTodayFlow(): Flow<SleepEntity?> = sleepDao.flowForDay(Dates.todayEpochDay())
+
+    val rankUps: Flow<List<RankUpEntity>> = rankUpDao.flowAll()
+    val challengeXp: Flow<Int> = challengeDao.flowTotal()
+    fun challengeClaimedTodayFlow(): Flow<Boolean> =
+        challengeDao.flowForDay(Dates.todayEpochDay()).map { it != null }
 
     // ─────────────────────────── Seed ───────────────────────────
     suspend fun seedIfNeeded() {
@@ -163,6 +172,7 @@ class Repository(private val db: AppDatabase) {
         )
 
         val newLevel = Leveling.levelFor(oldTotal + xp)
+        recordRankUps(oldLevel, newLevel, now)
         val unlocked = evaluateAchievements()
         return MeasurementOutcome(xp, oldLevel, newLevel, unlocked)
     }
@@ -232,6 +242,7 @@ class Repository(private val db: AppDatabase) {
         streakDao.upsert(streak.copy(current = newStreak, longest = longest, lastWorkoutEpochDay = today))
 
         val newLevel = Leveling.levelFor(oldTotal + total)
+        recordRankUps(oldLevel, newLevel, now)
         val unlocked = evaluateAchievements()
 
         return WorkoutOutcome(
@@ -349,6 +360,25 @@ class Repository(private val db: AppDatabase) {
         waterDao.upsert(WaterEntity(Dates.todayEpochDay(), ml.coerceAtLeast(0)))
     }
 
+    /** Фиксирует переход в новый ранг (для истории рангов). */
+    private suspend fun recordRankUps(oldLevel: Int, newLevel: Int, now: Long) {
+        if (newLevel <= oldLevel) return
+        for (level in (oldLevel + 1)..newLevel) {
+            val rank = Rank.forLevel(level)
+            if (rank != Rank.forLevel(level - 1)) {
+                rankUpDao.insert(RankUpEntity(level = level, rankTitle = rank.title, atMillis = now))
+            }
+        }
+    }
+
+    /** Начисляет бонус-XP за выполненное испытание дня — один раз в день. */
+    suspend fun claimDailyChallenge(bonusXp: Int): Boolean {
+        val today = Dates.todayEpochDay()
+        if (challengeDao.forDay(today) != null) return false
+        challengeDao.insert(ChallengeLogEntity(today, bonusXp.coerceAtLeast(0)))
+        return true
+    }
+
     // ─────────────────────────── Sleep ───────────────────────────
     suspend fun setSleepToday(hours: Double): List<AchievementDef> {
         sleepDao.upsert(SleepEntity(Dates.todayEpochDay(), hours.coerceIn(0.0, 24.0)))
@@ -367,6 +397,8 @@ class Repository(private val db: AppDatabase) {
         prDao.clear()
         waterDao.clear()
         sleepDao.clear()
+        rankUpDao.clear()
+        challengeDao.clear()
         achievementDao.relockAll()
         streakDao.upsert(StreakEntity())
         // Сохраняем текущий замер как новую точку отсчёта
@@ -384,7 +416,7 @@ class Repository(private val db: AppDatabase) {
 
     private suspend fun totalXpAll(): Int {
         val xp = workoutDao.xpTotals()
-        return xp.s + xp.e + xp.m + xp.d + measurementDao.compositionXp()
+        return xp.s + xp.e + xp.m + xp.d + measurementDao.compositionXp() + challengeDao.total()
     }
 
     // ─────────────────────────── Backup ───────────────────────────
@@ -414,6 +446,8 @@ class Repository(private val db: AppDatabase) {
         prDao.clear()
         waterDao.clear()
         sleepDao.clear()
+        rankUpDao.clear()
+        challengeDao.clear()
 
         data.profile?.let { profileDao.upsert(it) }
         data.measurements.forEach { measurementDao.insert(it.copy(id = 0)) }

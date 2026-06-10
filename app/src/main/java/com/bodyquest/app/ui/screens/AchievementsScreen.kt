@@ -21,6 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.bodyquest.app.domain.AchStats
+import com.bodyquest.app.domain.AchievementProgress
+import com.bodyquest.app.domain.AttributeType
 import com.bodyquest.app.ui.AchievementUi
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.art.AssetImageOr
@@ -30,6 +33,18 @@ import com.bodyquest.app.ui.theme.BqTertiary
 
 @Composable
 fun AchievementsScreen(state: AppUiState) {
+    val stats = AchStats(
+        workouts = state.sessions.size,
+        bossCount = state.sessions.count { it.isBoss },
+        longestStreak = state.streak?.longest ?: 0,
+        waistDrop = (state.first?.waist ?: 0.0) - (state.latest?.waist ?: 0.0),
+        weightDrop = (state.first?.weightKg ?: 0.0) - (state.latest?.weightKg ?: 0.0),
+        pullupBest = state.prs["pullup"]?.bestReps ?: 0,
+        strengthXp = state.attributeXp[AttributeType.STRENGTH] ?: 0,
+        enduranceXp = state.attributeXp[AttributeType.ENDURANCE] ?: 0,
+        mobilityXp = state.attributeXp[AttributeType.MOBILITY] ?: 0,
+        level = state.character?.overall?.level ?: 1,
+    )
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Зал достижений", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
         Text("Открыто ${state.unlockedCount} из ${state.achievements.size}",
@@ -42,13 +57,16 @@ fun AchievementsScreen(state: AppUiState) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            items(state.achievements) { Badge(it) }
+            items(state.achievements) { a ->
+                val progress = if (a.unlocked) null else AchievementProgress.forId(a.def.id, stats)
+                Badge(a, progress)
+            }
         }
     }
 }
 
 @Composable
-private fun Badge(a: AchievementUi) {
+private fun Badge(a: AchievementUi, progress: Pair<Int, Int>?) {
     val unlocked = a.unlocked
     Surface(
         color = if (unlocked) BqTertiary.copy(alpha = 0.16f) else BqSurface,
@@ -81,6 +99,16 @@ private fun Badge(a: AchievementUi) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
                 )
+                if (!unlocked && progress != null) {
+                    val (cur, target) = progress
+                    Text(
+                        "${cur.coerceIn(0, target)} / $target",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = BqTertiary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
         }
     }

@@ -123,3 +123,17 @@ data class SleepEntity(
     @PrimaryKey val dateEpochDay: Long,
     val hours: Double = 0.0,
 )
+
+@Entity(tableName = "rank_up")
+data class RankUpEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val level: Int,
+    val rankTitle: String,
+    val atMillis: Long,
+)
+
+@Entity(tableName = "challenge_log")
+data class ChallengeLogEntity(
+    @PrimaryKey val dateEpochDay: Long,
+    val bonusXp: Int,
+)

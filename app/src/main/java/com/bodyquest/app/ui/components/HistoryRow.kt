@@ -30,6 +30,11 @@ private val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yy")
 fun epochDayLabel(epochDay: Long): String =
     runCatching { LocalDate.ofEpochDay(epochDay).format(dateFmt) }.getOrDefault("—")
 
+fun epochMillisLabel(millis: Long): String = runCatching {
+    java.time.Instant.ofEpochMilli(millis)
+        .atZone(java.time.ZoneId.systemDefault()).toLocalDate().format(dateFmt)
+}.getOrDefault("—")
+
 /** Строка истории с кнопкой-корзиной и подтверждением удаления. */
 @Composable
 fun DeletableHistoryRow(title: String, subtitle: String, onDelete: () -> Unit) {

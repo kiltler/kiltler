@@ -167,6 +167,7 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                         onStartQuest = { navController.navigate("${Routes.WORKOUT}/$it") },
                         onOpenAchievements = { navController.navigate(Routes.ACHIEVEMENTS) },
                         onOpenLibrary = { navController.navigate(Routes.LIBRARY) },
+                        onClaimChallenge = vm::claimDailyChallenge,
                     )
                 }
                 composable(Routes.PROGRAM) {

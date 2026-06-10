@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.bodyquest.app.data.AchievementEntity
 import com.bodyquest.app.data.ExercisePrEntity
 import com.bodyquest.app.data.MeasurementEntity
+import com.bodyquest.app.data.RankUpEntity
 import com.bodyquest.app.data.Repository
 import com.bodyquest.app.data.SettingsEntity
 import com.bodyquest.app.data.SleepEntity
@@ -51,6 +52,8 @@ class BodyQuestViewModel(
         val profile: UserProfileEntity?,
         val xp: WorkoutXpTotals,
         val compositionXp: Int,
+        val challengeXp: Int,
+        val rankUps: List<RankUpEntity>,
     )
 
     private data class BodyBundle(
@@ -58,6 +61,7 @@ class BodyQuestViewModel(
         val all: List<MeasurementEntity>,
         val streak: StreakEntity?,
         val sessions: List<WorkoutSessionEntity>,
+        val challengeClaimedToday: Boolean,
     )
 
     private data class ProgressBundle(
@@ -67,9 +71,12 @@ class BodyQuestViewModel(
         val sleep: SleepEntity?,
     )
 
-    private val core = combine(repo.profile, repo.xpTotals, repo.compositionXp, ::CoreBundle)
+    private val core = combine(
+        repo.profile, repo.xpTotals, repo.compositionXp, repo.challengeXp, repo.rankUps, ::CoreBundle
+    )
     private val body = combine(
-        repo.latestMeasurement, repo.measurements, repo.streak, repo.sessions, ::BodyBundle
+        repo.latestMeasurement, repo.measurements, repo.streak, repo.sessions,
+        repo.challengeClaimedTodayFlow(), ::BodyBundle
     )
     private val progress = combine(
         repo.achievements, repo.prs, repo.waterTodayFlow(), repo.sleepTodayFlow(), ::ProgressBundle
@@ -100,7 +107,8 @@ class BodyQuestViewModel(
             AttributeType.DISCIPLINE to c.xp.d,
             AttributeType.COMPOSITION to c.compositionXp,
         )
-        val totalXp = attrXp.values.sum()
+        // Общий XP = сумма характеристик + бонус за испытания (в радар не идёт).
+        val totalXp = attrXp.values.sum() + c.challengeXp
         val overall = Leveling.progressFor(totalXp)
         val character = CharacterState(
             name = profile?.name ?: "Герой",
@@ -108,6 +116,11 @@ class BodyQuestViewModel(
             rank = Rank.forLevel(overall.level),
             attributes = attrXp.mapValues { Leveling.progressFor(it.value) },
         )
+
+        // Даты достижения рангов: самый ранний rank-up на каждый ранг.
+        val rankDates: Map<Int, Long> = c.rankUps
+            .groupBy { Rank.forLevel(it.level).index }
+            .mapValues { (_, list) -> list.minOf { it.atMillis } }
 
         val program: Program = ProgramSeed.programFor(profile?.daysPerWeek ?: 3)
         val (todayQuest, rest) = questForToday(program)
@@ -146,6 +159,9 @@ class BodyQuestViewModel(
             sleepHours = p.sleep?.hours ?: 0.0,
             achievements = achievements,
             prs = p.prs.associateBy { it.exerciseId },
+            attributeXp = attrXp,
+            rankDates = rankDates,
+            challengeClaimedToday = b.challengeClaimedToday,
         )
     }
 
@@ -256,6 +272,12 @@ class BodyQuestViewModel(
             _message.value =
                 if (repo.deleteMeasurement(id)) "Замер удалён"
                 else "Нельзя удалить единственный замер"
+        }
+    }
+
+    fun claimDailyChallenge(bonusXp: Int) {
+        viewModelScope.launch {
+            if (repo.claimDailyChallenge(bonusXp)) _message.value = "Испытание выполнено: +$bonusXp XP"
         }
     }
 

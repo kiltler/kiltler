@@ -19,8 +19,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SettingsEntity::class,
         WaterEntity::class,
         SleepEntity::class,
+        RankUpEntity::class,
+        ChallengeLogEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +35,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun settingsDao(): SettingsDao
     abstract fun waterDao(): WaterDao
     abstract fun sleepDao(): SleepDao
+    abstract fun rankUpDao(): RankUpDao
+    abstract fun challengeDao(): ChallengeDao
 
     companion object {
         @Volatile
@@ -49,6 +53,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 → v3: история рангов и журнал бонус-XP за испытания. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `rank_up` " +
+                        "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `level` INTEGER NOT NULL, " +
+                        "`rankTitle` TEXT NOT NULL, `atMillis` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `challenge_log` " +
+                        "(`dateEpochDay` INTEGER NOT NULL, `bonusXp` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`dateEpochDay`))"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -56,7 +76,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "bodyquest.db",
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     // НЕ используем fallbackToDestructiveMigration: прогресс не должен
                     // теряться при обновлении. Каждое изменение схемы — отдельная Migration.
                     .build().also { INSTANCE = it }

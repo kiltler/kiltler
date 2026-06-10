@@ -193,6 +193,39 @@ interface SettingsDao {
 }
 
 @Dao
+interface RankUpDao {
+    @Query("SELECT * FROM rank_up ORDER BY atMillis ASC")
+    fun flowAll(): Flow<List<RankUpEntity>>
+
+    @Insert
+    suspend fun insert(item: RankUpEntity)
+
+    @Query("DELETE FROM rank_up")
+    suspend fun clear()
+}
+
+@Dao
+interface ChallengeDao {
+    @Query("SELECT * FROM challenge_log WHERE dateEpochDay = :day")
+    fun flowForDay(day: Long): Flow<ChallengeLogEntity?>
+
+    @Query("SELECT * FROM challenge_log WHERE dateEpochDay = :day")
+    suspend fun forDay(day: Long): ChallengeLogEntity?
+
+    @Query("SELECT COALESCE(SUM(bonusXp), 0) FROM challenge_log")
+    fun flowTotal(): Flow<Int>
+
+    @Query("SELECT COALESCE(SUM(bonusXp), 0) FROM challenge_log")
+    suspend fun total(): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(item: ChallengeLogEntity)
+
+    @Query("DELETE FROM challenge_log")
+    suspend fun clear()
+}
+
+@Dao
 interface WaterDao {
     @Query("SELECT * FROM water_log WHERE dateEpochDay = :day")
     fun flowForDay(day: Long): Flow<WaterEntity?>

@@ -49,6 +49,9 @@ data class AppUiState(
     val achievements: List<AchievementUi> = emptyList(),
     val sets: List<SetEntity> = emptyList(),
     val prs: Map<String, ExercisePrEntity> = emptyMap(),
+    val attributeXp: Map<AttributeType, Int> = emptyMap(),
+    val rankDates: Map<Int, Long> = emptyMap(),
+    val challengeClaimedToday: Boolean = false,
 ) {
     val unlockedCount: Int get() = achievements.count { it.unlocked }
 }

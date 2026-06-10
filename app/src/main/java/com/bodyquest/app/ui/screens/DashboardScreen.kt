@@ -42,11 +42,12 @@ import com.bodyquest.app.ui.theme.BqSecondary
 import com.bodyquest.app.ui.theme.BqTertiary
 
 @Composable
-fun CharacterCard(character: CharacterState) {
+fun CharacterCard(character: CharacterState, rankDates: Map<Int, Long>) {
     var showRanks by remember { mutableStateOf(false) }
     if (showRanks) RankSystemDialog(
         currentRank = character.rank,
         currentLevel = character.overall.level,
+        achievedDates = rankDates,
         onDismiss = { showRanks = false },
     )
 
@@ -110,13 +111,14 @@ fun DashboardScreen(
     onStartQuest: (String) -> Unit,
     onOpenAchievements: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onClaimChallenge: (Int) -> Unit,
 ) {
     val character = state.character ?: return
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CharacterCard(character)
+        CharacterCard(character, state.rankDates)
 
         // Квест дня
         SectionTitle("Квест дня")
@@ -196,6 +198,7 @@ fun DashboardScreen(
                 ChallengeKind.SLEEP_8H -> state.sleepHours >= 8.0
                 ChallengeKind.BEAT_BOSS -> state.sessions.any { it.dateEpochDay == today && it.isBoss }
             }
+            val bonus = 25
             SectionTitle("Испытание дня")
             BqCard(Modifier.fillMaxWidth()) {
                 Row(
@@ -206,11 +209,22 @@ fun DashboardScreen(
                     Text("${ch.emoji}  ${ch.title}", style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f))
                     Text(
-                        if (done) "✅ Выполнено" else "В процессе",
+                        "+$bonus XP",
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (done) BqSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = BqTertiary,
                         fontWeight = FontWeight.Bold,
                     )
+                }
+                when {
+                    state.challengeClaimedToday -> Text("🏆 Награда получена",
+                        style = MaterialTheme.typography.labelLarge, color = BqSecondary,
+                        modifier = Modifier.padding(top = 8.dp))
+                    done -> Button(onClick = { onClaimChallenge(bonus) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        Text("Получить награду +$bonus XP", fontWeight = FontWeight.Bold)
+                    }
+                    else -> Text("В процессе…", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                 }
             }
         }
