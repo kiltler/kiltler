@@ -25,3 +25,7 @@ val AttrComposition = Color(0xFFB57BFF)
 
 val BqDanger = Color(0xFFFF5C5C)
 val BqSuccess = Color(0xFF3DDC84)
+
+// ── Доп. токены для лоска (additive — существующие значения не меняются) ──
+val BqSurfaceElevated = Color(0xFF1A2030)  // приподнятая поверхность карточек
+val BqHairline = Color(0x22FFFFFF)         // тонкая «волосяная» граница
