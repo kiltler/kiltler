@@ -21,8 +21,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SleepEntity::class,
         RankUpEntity::class,
         ChallengeLogEntity::class,
+        FrozenDayEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sleepDao(): SleepDao
     abstract fun rankUpDao(): RankUpDao
     abstract fun challengeDao(): ChallengeDao
+    abstract fun frozenDayDao(): FrozenDayDao
 
     companion object {
         @Volatile
@@ -69,6 +71,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 → v4: заморозки серии (токены + замороженные дни) и цель замеров. */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `settings` ADD COLUMN `freezeTokens` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `settings` ADD COLUMN `targetWaist` REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `settings` ADD COLUMN `targetBelly` REAL NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `frozen_day` " +
+                        "(`dateEpochDay` INTEGER NOT NULL, PRIMARY KEY(`dateEpochDay`))"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -76,7 +91,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "bodyquest.db",
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     // НЕ используем fallbackToDestructiveMigration: прогресс не должен
                     // теряться при обновлении. Каждое изменение схемы — отдельная Migration.
                     .build().also { INSTANCE = it }

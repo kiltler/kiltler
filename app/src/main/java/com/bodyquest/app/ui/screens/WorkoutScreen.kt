@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,9 +42,11 @@ import com.bodyquest.app.domain.LoggedSet
 import com.bodyquest.app.domain.PlannedExercise
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.seed.ExerciseCatalog
+import com.bodyquest.app.domain.seed.ExerciseEquivalence
 import com.bodyquest.app.notifications.RestTimerController
 import com.bodyquest.app.notifications.RestTimerService
 import com.bodyquest.app.ui.AppUiState
+import com.bodyquest.app.ui.Haptics
 import com.bodyquest.app.ui.art.ExerciseImage
 import com.bodyquest.app.ui.openTechniqueVideo
 import com.bodyquest.app.ui.components.BqCard
@@ -86,8 +90,14 @@ fun WorkoutScreen(
     // Таймер отдыха живёт в foreground-service: тикает даже при свёрнутом приложении,
     // показывает уведомление и вибрирует по окончании. UI лишь читает остаток.
     val restRemaining by RestTimerController.remaining.collectAsState()
-    fun startRest(seconds: Int) = RestTimerService.start(context, seconds)
+    fun startRest(seconds: Int) {
+        Haptics.setComplete(context) // тактильный «тик» завершения подхода
+        RestTimerService.start(context, seconds)
+    }
     fun stopRest() = RestTimerService.stop(context)
+
+    // Реролл: индекс упражнения → текущий id замены (равноценный)
+    val rerolled = remember(day.id) { mutableStateMapOf<Int, String>() }
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -102,13 +112,24 @@ fun WorkoutScreen(
                 day.warmup.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
             }
 
-            sheets.forEach { (planned, rows) ->
-                val pr = state.prs[planned.exerciseId]
+            sheets.forEachIndexed { index, (planned, rows) ->
+                // варианты = оригинал + равноценные замены; реролл циклически переключает
+                val options = remember(planned.exerciseId) {
+                    listOf(planned.exerciseId) + ExerciseEquivalence.alternatives(planned.exerciseId)
+                }
+                val currentId = rerolled[index] ?: planned.exerciseId
+                val pr = state.prs[currentId]
                 ExerciseBlock(
                     planned = planned,
+                    exerciseId = currentId,
                     rows = rows,
                     lastTopReps = pr?.lastReps ?: 0,
                     lastTopTime = pr?.lastTimeSeconds ?: 0,
+                    canReroll = options.size > 1,
+                    onReroll = {
+                        val i = options.indexOf(currentId).coerceAtLeast(0)
+                        rerolled[index] = options[(i + 1) % options.size]
+                    },
                     onRest = { startRest(planned.restSeconds) },
                     onAddSet = { rows.add(SetRow("", rows.lastOrNull()?.weight ?: "", "")) },
                 )
@@ -117,15 +138,16 @@ fun WorkoutScreen(
             Button(
                 onClick = {
                     val logged = mutableListOf<LoggedSet>()
-                    sheets.forEach { (planned, rows) ->
-                        val ex = ExerciseCatalog.get(planned.exerciseId)
-                        val name = ex?.name ?: planned.exerciseId
+                    sheets.forEachIndexed { index, (planned, rows) ->
+                        val effId = rerolled[index] ?: planned.exerciseId
+                        val ex = ExerciseCatalog.get(effId)
+                        val name = ex?.name ?: effId
                         rows.forEach { r ->
                             val reps = r.reps.toIntOrNull() ?: 0
                             val weight = r.weight.toDoubleOrNull() ?: 0.0
                             val time = r.time.toIntOrNull() ?: 0
                             if (reps > 0 || time > 0) {
-                                logged.add(LoggedSet(planned.exerciseId, name, reps, weight, time))
+                                logged.add(LoggedSet(effId, name, reps, weight, time))
                             }
                         }
                     }
@@ -170,13 +192,16 @@ fun WorkoutScreen(
 @Composable
 private fun ExerciseBlock(
     planned: PlannedExercise,
+    exerciseId: String,
     rows: SnapshotStateList<SetRow>,
     lastTopReps: Int,
     lastTopTime: Int,
+    canReroll: Boolean,
+    onReroll: () -> Unit,
     onRest: () -> Unit,
     onAddSet: () -> Unit,
 ) {
-    val ex = ExerciseCatalog.get(planned.exerciseId)
+    val ex = ExerciseCatalog.get(exerciseId)
     val context = LocalContext.current
     val isTimed = ex?.type == ExerciseType.TIMED || ex?.type == ExerciseType.MOBILITY
     val target = upperRepBound(planned.targetReps)
@@ -194,17 +219,22 @@ private fun ExerciseBlock(
                 modifier = Modifier.size(64.dp),
             ) {
                 ExerciseImage(
-                    exerciseId = planned.exerciseId,
+                    exerciseId = exerciseId,
                     modifier = Modifier.size(64.dp).padding(6.dp),
                 )
             }
             Column(Modifier.weight(1f)) {
-                Text(ex?.name ?: planned.exerciseId, style = MaterialTheme.typography.titleMedium,
+                Text(ex?.name ?: exerciseId, style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold)
                 Text("${planned.sets} × ${planned.targetReps}", style = MaterialTheme.typography.bodyMedium,
                     color = BqSecondary)
             }
-            IconButton(onClick = { openTechniqueVideo(context, ex?.name ?: planned.exerciseId) }) {
+            if (canReroll) {
+                IconButton(onClick = onReroll) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Заменить упражнение", tint = BqTertiary)
+                }
+            }
+            IconButton(onClick = { openTechniqueVideo(context, ex?.name ?: exerciseId) }) {
                 Icon(Icons.Filled.PlayCircle, contentDescription = "Видео техники", tint = BqSecondary)
             }
         }

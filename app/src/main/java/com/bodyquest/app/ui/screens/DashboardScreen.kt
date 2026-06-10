@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,12 +30,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.Analytics
 import com.bodyquest.app.domain.AttributeType
+import com.bodyquest.app.domain.AvatarMapper
+import com.bodyquest.app.domain.ModifierEngine
+import com.bodyquest.app.domain.WeakLinkAnalyzer
 import com.bodyquest.app.domain.seed.ChallengeCatalog
 import com.bodyquest.app.domain.seed.ChallengeKind
+import com.bodyquest.app.domain.seed.ExerciseCatalog
+import com.bodyquest.app.domain.seed.QuickWorkout
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.CharacterState
 import com.bodyquest.app.ui.art.AssetImageOr
+import com.bodyquest.app.ui.art.LivingAvatar
 import com.bodyquest.app.ui.components.BqCard
+import com.bodyquest.app.ui.theme.BqPrimary
+import com.bodyquest.app.ui.theme.BqSurfaceVariant
 import com.bodyquest.app.ui.components.RadarChart
 import com.bodyquest.app.ui.components.RankSystemDialog
 import com.bodyquest.app.ui.components.SectionTitle
@@ -112,13 +123,79 @@ fun DashboardScreen(
     onOpenAchievements: () -> Unit,
     onOpenLibrary: () -> Unit,
     onClaimChallenge: (Int) -> Unit,
+    onFreezeDay: () -> Unit,
 ) {
     val character = state.character ?: return
+    val today = java.time.LocalDate.now().toEpochDay()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         CharacterCard(character, state.rankDates)
+
+        // Модификатор дня
+        val mod = ModifierEngine.forDay(today)
+        Surface(color = BqPrimary.copy(alpha = 0.14f), shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth()) {
+            Text("${mod.emoji}  ${mod.title}", style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(12.dp))
+        }
+
+        // Живой аватар по реальным замерам + призрак цели
+        val base = state.first
+        val cur = state.latest
+        if (base != null && cur != null) {
+            val shape = AvatarMapper.shape(
+                base.shoulders, base.waist, base.belly, base.weightKg,
+                cur.shoulders, cur.waist, cur.belly, cur.weightKg,
+            )
+            val ghost = AvatarMapper.target(
+                base.shoulders, base.waist, base.belly, base.weightKg,
+                cur.shoulders, cur.weightKg, state.targetWaist, state.targetBelly,
+            )
+            val vRatio = if (cur.waist > 0) cur.shoulders / cur.waist else 0.0
+            val goalWaist = if (state.targetWaist > 0) state.targetWaist else base.waist * 0.88
+            SectionTitle("Твой силуэт")
+            BqCard(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LivingAvatar(shape = shape, ghost = ghost,
+                        modifier = Modifier.size(110.dp).height(150.dp))
+                    Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                        Text("V-силуэт (плечи/талия)", style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${(vRatio * 100).toInt()}%", style = MaterialTheme.typography.headlineMedium,
+                            color = BqTertiary, fontWeight = FontWeight.Black)
+                        val toGoal = cur.waist - goalWaist
+                        Text(
+                            if (toGoal > 0.5) "До цели по талии: −${toGoal.toInt()} см"
+                            else "Цель по талии достигнута! 🎯",
+                            style = MaterialTheme.typography.labelLarge, color = BqSecondary,
+                        )
+                        Text("Полупрозрачный силуэт — цель.", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        // Наджадж по слабому звену
+        run {
+            var push = 0.0; var pull = 0.0
+            state.sets.forEach { s ->
+                val ex = ExerciseCatalog.get(s.exerciseId) ?: return@forEach
+                val vol = s.reps.toDouble() * maxOf(s.weightKg, 1.0) + s.timeSeconds
+                if (WeakLinkAnalyzer.isPush(ex.muscles)) push += vol
+                if (WeakLinkAnalyzer.isPull(ex.muscles)) pull += vol
+            }
+            if (state.attributeXp.isNotEmpty()) {
+                val weak = WeakLinkAnalyzer.analyze(state.attributeXp, push, pull)
+                Surface(color = BqSurfaceVariant, shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text("🎯  ${weak.advice}", style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp))
+                }
+            }
+        }
 
         // Квест дня
         SectionTitle("Квест дня")
@@ -153,6 +230,24 @@ fun DashboardScreen(
                     color = BqSecondary, modifier = Modifier.padding(top = 6.dp))
                 Button(onClick = { onStartQuest(quest.id) }, modifier = Modifier.padding(top = 10.dp).fillMaxWidth()) {
                     Text("Начать тренировку", fontWeight = FontWeight.Bold)
+                }
+            }
+            OutlinedButton(
+                onClick = { onStartQuest(QuickWorkout.ID) },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) { Text("⏱️ Мало времени (≈10 мин)") }
+        }
+
+        // Заморозка серии
+        Surface(color = BqSurfaceVariant, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth().padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("❄️ Заморозки серии: ${state.freezeTokens}/3", style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = onFreezeDay, enabled = state.freezeTokens > 0) {
+                    Text("Заморозить день")
                 }
             }
         }

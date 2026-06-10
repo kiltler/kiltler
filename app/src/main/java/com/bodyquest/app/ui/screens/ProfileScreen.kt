@@ -54,6 +54,7 @@ fun ProfileScreen(
     onDeleteMeasurement: (Long) -> Unit,
     onShare: () -> Unit,
     onOpenHistory: () -> Unit,
+    onSetTargets: (Double, Double) -> Unit,
     onReset: () -> Unit,
 ) {
     val exportLauncher = rememberLauncherForActivityResult(
@@ -176,6 +177,26 @@ fun ProfileScreen(
                     )
                 }
             }
+        }
+
+        BqCard(Modifier.fillMaxWidth()) {
+            SectionTitle("Цель силуэта (для «призрака»)")
+            var tWaist by remember(state.targetWaist) {
+                mutableStateOf(if (state.targetWaist > 0) state.targetWaist.toString() else "")
+            }
+            var tBelly by remember(state.targetBelly) {
+                mutableStateOf(if (state.targetBelly > 0) state.targetBelly.toString() else "")
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField("Цель талии, см", tWaist, { tWaist = it }, Modifier.weight(1f))
+                NumberField("Цель живота, см", tBelly, { tBelly = it }, Modifier.weight(1f))
+            }
+            Button(
+                onClick = { onSetTargets(tWaist.toDoubleOrNull() ?: 0.0, tBelly.toDoubleOrNull() ?: 0.0) },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) { Text("Сохранить цель") }
+            Text("Пусто = авто (−12% от старта). Цель видно на главной как полупрозрачный силуэт.",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         BqCard(Modifier.fillMaxWidth()) {

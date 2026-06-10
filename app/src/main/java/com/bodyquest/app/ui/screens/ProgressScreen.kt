@@ -19,6 +19,10 @@ import androidx.compose.ui.unit.dp
 import com.bodyquest.app.data.SetEntity
 import com.bodyquest.app.domain.Analytics
 import com.bodyquest.app.domain.AttributeType
+import com.bodyquest.app.domain.ExerciseType
+import com.bodyquest.app.domain.ForecastEngine
+import com.bodyquest.app.domain.PlateauDetector
+import com.bodyquest.app.domain.seed.ExerciseCatalog
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.DeletableHistoryRow
@@ -84,6 +88,69 @@ fun ProgressScreen(state: AppUiState, onDeleteSession: (Long) -> Unit) {
                     }
                     Text("Цель — растить это число: шире плечи, уже талия.",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        // Прогноз метрик к дате + детектор плато
+        run {
+            val today = java.time.LocalDate.now().toEpochDay()
+            val fW = ForecastEngine.fit(m.map { it.dateEpochDay to it.weightKg })
+            val fWa = ForecastEngine.fit(m.map { it.dateEpochDay to it.waist })
+            BqCard(Modifier.fillMaxWidth()) {
+                SectionTitle("Прогноз")
+                if (fW == null) {
+                    Text("Недостаточно данных — добавь ещё замеров.",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    when (fW.direction) {
+                        0 -> Text("Вес: удерживаешь, без динамики (±${"%.1f".format(fW.band)} кг разброс).",
+                            style = MaterialTheme.typography.bodyMedium)
+                        else -> Text(
+                            "Вес: ${"%+.1f".format(fW.ratePerWeek)} кг/нед " +
+                                "(±${"%.1f".format(fW.band)} кг).",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (fW.direction < 0) BqSuccess else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    // гайдрейл: слишком быстрая потеря веса
+                    val tooFast = fW.direction < 0 && -fW.ratePerWeek > fW.lastValue * 0.01
+                    if (tooFast) {
+                        Text("⚠️ Темп снижения высокий (>1%/нед). Быстрее не лучше — выше риск потерять мышцы " +
+                            "при рекомпозиции. Не повод ускоряться.",
+                            style = MaterialTheme.typography.labelMedium, color = BqTertiary,
+                            modifier = Modifier.padding(top = 4.dp))
+                    }
+                    // прогноз талии к цели
+                    val goalWaist = if (state.targetWaist > 0) state.targetWaist
+                    else (state.first?.waist ?: 0.0) * 0.88
+                    if (fWa != null && goalWaist > 0) {
+                        val days = ForecastEngine.daysToReach(fWa, goalWaist)
+                        if (days != null && days in 1..3650) {
+                            Text("Талия $goalWaist см ≈ к ${epochDayLabel(today + days)} при текущем темпе.",
+                                style = MaterialTheme.typography.bodyMedium, color = BqSecondary,
+                                modifier = Modifier.padding(top = 6.dp))
+                        }
+                    }
+                }
+
+                // Плато
+                val stall = PlateauDetector.isWeightStall(m.map { it.dateEpochDay to it.weightKg }, today)
+                val plateaued = state.sets.map { it.exerciseId }.distinct().mapNotNull { id ->
+                    val ex = ExerciseCatalog.get(id)
+                    val best = if (ex?.type == ExerciseType.WEIGHTED_REPS)
+                        sessionMaxWeight(state.sets, id) else sessionMaxReps(state.sets, id)
+                    if (PlateauDetector.isLiftPlateau(best.map { it.toDouble() })) (ex?.name ?: id) else null
+                }
+                if (stall) {
+                    Text("📉 Вес встал ≥3 недели. Если цель — снижение, пора менять стимул (нагрузка/питание).",
+                        style = MaterialTheme.typography.labelMedium, color = BqTertiary,
+                        modifier = Modifier.padding(top = 8.dp))
+                }
+                plateaued.forEach { name ->
+                    Text("🧱 Плато: $name — попробуй вариацию, смену диапазона повторов или разгрузку.",
+                        style = MaterialTheme.typography.labelMedium, color = BqTertiary,
+                        modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }

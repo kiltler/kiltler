@@ -42,6 +42,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.bodyquest.app.domain.seed.ProgramSeed
+import com.bodyquest.app.domain.seed.QuickWorkout
 import com.bodyquest.app.ui.components.ConfettiOverlay
 import com.bodyquest.app.ui.components.MeasurementRewardDialog
 import com.bodyquest.app.ui.components.WorkoutRewardDialog
@@ -106,7 +107,14 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
     val message by vm.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showConfetti by remember { mutableStateOf(false) }
-    LaunchedEffect(workoutOutcome) { if (workoutOutcome != null) showConfetti = true }
+    LaunchedEffect(workoutOutcome) {
+        val o = workoutOutcome ?: return@LaunchedEffect
+        showConfetti = true
+        when {
+            o.leveledUp -> Haptics.levelUp(context)
+            o.progressed.isNotEmpty() -> Haptics.pr(context)
+        }
+    }
     LaunchedEffect(message) {
         message?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
@@ -170,6 +178,7 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                         onOpenAchievements = { navController.navigate(Routes.ACHIEVEMENTS) },
                         onOpenLibrary = { navController.navigate(Routes.LIBRARY) },
                         onClaimChallenge = vm::claimDailyChallenge,
+                        onFreezeDay = vm::freezeToday,
                     )
                 }
                 composable(Routes.PROGRAM) {
@@ -201,6 +210,7 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                         onDeleteMeasurement = vm::deleteMeasurement,
                         onShare = vm::shareProgress,
                         onOpenHistory = { navController.navigate(Routes.HISTORY) },
+                        onSetTargets = vm::setTargetMeasurements,
                         onReset = vm::resetProgress,
                     )
                 }
@@ -211,6 +221,7 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                     val dayId = entry.arguments?.getString("dayId")
                     val program = state.program
                     val day = when {
+                        dayId == QuickWorkout.ID -> QuickWorkout.generate()
                         program == null -> null
                         dayId == ProgramSeed.mobilityDay.id -> ProgramSeed.mobilityDay
                         program.bosses.any { it.id == dayId } -> program.bosses.first { it.id == dayId }

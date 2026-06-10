@@ -1,5 +1,6 @@
 package com.bodyquest.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -110,6 +111,15 @@ data class SettingsEntity(
     val reminderHour: Int = 18,
     val reminderMinute: Int = 30,
     val waterRemindersEnabled: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val freezeTokens: Int = 0,
+    @ColumnInfo(defaultValue = "0") val targetWaist: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val targetBelly: Double = 0.0,
+)
+
+/** День, «замороженный» токеном серии — не рвёт streak. */
+@Entity(tableName = "frozen_day")
+data class FrozenDayEntity(
+    @PrimaryKey val dateEpochDay: Long,
 )
 
 @Entity(tableName = "water_log")

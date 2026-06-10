@@ -266,3 +266,18 @@ interface SleepDao {
     @Query("DELETE FROM sleep_log")
     suspend fun clear()
 }
+
+@Dao
+interface FrozenDayDao {
+    @Query("SELECT * FROM frozen_day")
+    fun flowAll(): Flow<List<FrozenDayEntity>>
+
+    @Query("SELECT dateEpochDay FROM frozen_day")
+    suspend fun allDays(): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(day: FrozenDayEntity)
+
+    @Query("DELETE FROM frozen_day")
+    suspend fun clear()
+}

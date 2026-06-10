@@ -71,6 +71,7 @@ class BodyQuestViewModel(
         val prs: List<ExercisePrEntity>,
         val water: WaterEntity?,
         val sleep: SleepEntity?,
+        val settings: SettingsEntity?,
     )
 
     private val core = combine(
@@ -81,7 +82,8 @@ class BodyQuestViewModel(
         repo.challengeClaimedTodayFlow(), ::BodyBundle
     )
     private val progress = combine(
-        repo.achievements, repo.prs, repo.waterTodayFlow(), repo.sleepTodayFlow(), ::ProgressBundle
+        repo.achievements, repo.prs, repo.waterTodayFlow(), repo.sleepTodayFlow(), repo.settings,
+        ::ProgressBundle
     )
 
     val state: StateFlow<AppUiState> =
@@ -164,6 +166,9 @@ class BodyQuestViewModel(
             attributeXp = attrXp,
             rankDates = rankDates,
             challengeClaimedToday = b.challengeClaimedToday,
+            freezeTokens = p.settings?.freezeTokens ?: 0,
+            targetWaist = p.settings?.targetWaist ?: 0.0,
+            targetBelly = p.settings?.targetBelly ?: 0.0,
         )
     }
 
@@ -281,6 +286,18 @@ class BodyQuestViewModel(
         viewModelScope.launch {
             if (repo.claimDailyChallenge(bonusXp)) _message.value = "Испытание выполнено: +$bonusXp XP"
         }
+    }
+
+    fun freezeToday() {
+        viewModelScope.launch {
+            _message.value =
+                if (repo.freezeToday()) "День заморожен — серия в безопасности ❄️"
+                else "Нет заморозок: тренируйся 7 дней подряд, чтобы заработать"
+        }
+    }
+
+    fun setTargetMeasurements(waist: Double, belly: Double) {
+        viewModelScope.launch { repo.setTargetMeasurements(waist, belly) }
     }
 
     fun shareProgress() {

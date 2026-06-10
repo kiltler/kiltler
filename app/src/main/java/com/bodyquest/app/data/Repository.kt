@@ -5,9 +5,12 @@ import com.bodyquest.app.domain.Dates
 import com.bodyquest.app.domain.Leveling
 import com.bodyquest.app.domain.LoggedSet
 import com.bodyquest.app.domain.MeasurementOutcome
+import com.bodyquest.app.domain.FreezeRules
+import com.bodyquest.app.domain.ModifierEngine
 import com.bodyquest.app.domain.Rank
 import com.bodyquest.app.domain.Streaks
 import com.bodyquest.app.domain.WorkoutDay
+import com.bodyquest.app.domain.XpPipeline
 import com.bodyquest.app.domain.WorkoutOutcome
 import com.bodyquest.app.domain.WorkoutScoring
 import com.bodyquest.app.domain.seed.AchievementCatalog
@@ -33,6 +36,7 @@ class Repository(private val db: AppDatabase) {
     private val sleepDao = db.sleepDao()
     private val rankUpDao = db.rankUpDao()
     private val challengeDao = db.challengeDao()
+    private val frozenDayDao = db.frozenDayDao()
 
     // ─────────────────────────── Flows ───────────────────────────
     val profile: Flow<UserProfileEntity?> = profileDao.flow()
@@ -188,15 +192,17 @@ class Repository(private val db: AppDatabase) {
         val today = Dates.todayEpochDay()
         val now = System.currentTimeMillis()
 
-        // Серия дней
+        // Серия дней (замороженные дни не рвут streak)
+        val frozen = frozenDayDao.allDays().toSet()
         val streak = streakDao.get() ?: StreakEntity()
-        val newStreak = Streaks.nextStreak(streak.lastWorkoutEpochDay, streak.current, today)
+        val newStreak = Streaks.nextStreak(streak.lastWorkoutEpochDay, streak.current, today, frozen)
         val longest = max(streak.longest, newStreak)
         val multiplier = Leveling.streakMultiplier(newStreak)
 
-        // XP
+        // XP: базовый → модификатор дня → множитель серии
+        val modifier = ModifierEngine.forDay(today)
         val base = WorkoutScoring.baseXp(completed, day.isBoss)
-        val xpByAttr = base.mapValues { (it.value * multiplier).roundToInt() }
+        val xpByAttr = XpPipeline.apply(base, modifier, multiplier)
         val total = xpByAttr.values.sum()
 
         val oldTotal = totalXpAll()
@@ -236,6 +242,12 @@ class Repository(private val db: AppDatabase) {
 
         val progressed = updatePrs(completed, now)
         streakDao.upsert(streak.copy(current = newStreak, longest = longest, lastWorkoutEpochDay = today))
+
+        // Начисление токенов заморозки за каждые 7 дней серии (с лимитом)
+        settingsDao.get()?.let { s ->
+            val granted = FreezeRules.grantAfter(s.freezeTokens, newStreak)
+            if (granted != s.freezeTokens) settingsDao.upsert(s.copy(freezeTokens = granted))
+        }
 
         val newLevel = Leveling.levelFor(oldTotal + total)
         recordRankUps(oldLevel, newLevel, now)
@@ -384,6 +396,21 @@ class Repository(private val db: AppDatabase) {
     // ─────────────────────────── Settings ───────────────────────────
     suspend fun updateSettings(settings: SettingsEntity) = settingsDao.upsert(settings)
 
+    /** Заморозить сегодняшний день: тратит токен, день перестаёт рвать серию. */
+    suspend fun freezeToday(): Boolean {
+        val s = settingsDao.get() ?: return false
+        if (s.freezeTokens <= 0) return false
+        frozenDayDao.insert(FrozenDayEntity(Dates.todayEpochDay()))
+        settingsDao.upsert(s.copy(freezeTokens = s.freezeTokens - 1))
+        return true
+    }
+
+    /** Цель «призрака»: целевые талия/живот (см). 0 = авто. */
+    suspend fun setTargetMeasurements(waist: Double, belly: Double) {
+        val s = settingsDao.get() ?: SettingsEntity()
+        settingsDao.upsert(s.copy(targetWaist = waist.coerceAtLeast(0.0), targetBelly = belly.coerceAtLeast(0.0)))
+    }
+
     // ─────────────────────────── Reset ───────────────────────────
     suspend fun resetProgress() {
         val latest = measurementDao.latest()
@@ -395,6 +422,8 @@ class Repository(private val db: AppDatabase) {
         sleepDao.clear()
         rankUpDao.clear()
         challengeDao.clear()
+        frozenDayDao.clear()
+        settingsDao.get()?.let { settingsDao.upsert(it.copy(freezeTokens = 0)) }
         achievementDao.relockAll()
         streakDao.upsert(StreakEntity())
         // Сохраняем текущий замер как новую точку отсчёта
@@ -444,6 +473,7 @@ class Repository(private val db: AppDatabase) {
         sleepDao.clear()
         rankUpDao.clear()
         challengeDao.clear()
+        frozenDayDao.clear()
 
         data.profile?.let { profileDao.upsert(it) }
         data.measurements.forEach { measurementDao.insert(it.copy(id = 0)) }
