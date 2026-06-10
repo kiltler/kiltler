@@ -18,9 +18,11 @@ class ReminderScheduler(private val context: Context) {
         const val CHANNEL_ID = "bodyquest_reminders"
         const val WORKOUT_REQUEST = 1001
         const val WATER_REQUEST = 1002
+        const val STREAK_REQUEST = 1003
         const val EXTRA_KIND = "kind"
         const val KIND_WORKOUT = "workout"
         const val KIND_WATER = "water"
+        const val KIND_STREAK = "streak"
     }
 
     fun ensureChannel() {
@@ -47,9 +49,14 @@ class ReminderScheduler(private val context: Context) {
     fun scheduleWorkout(hour: Int, minute: Int) {
         ensureChannel()
         scheduleDaily(WORKOUT_REQUEST, KIND_WORKOUT, hour, minute)
+        // Страж серии: вечером напомнит, только если сегодня не было тренировки.
+        scheduleDaily(STREAK_REQUEST, KIND_STREAK, 20, 0)
     }
 
-    fun cancelWorkout() = cancel(WORKOUT_REQUEST, KIND_WORKOUT)
+    fun cancelWorkout() {
+        cancel(WORKOUT_REQUEST, KIND_WORKOUT)
+        cancel(STREAK_REQUEST, KIND_STREAK)
+    }
 
     /** Напоминание о воде — ежедневно в полдень (упрощённо, один раз в день). */
     fun scheduleWater(enabled: Boolean) {

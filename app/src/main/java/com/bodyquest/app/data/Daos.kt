@@ -80,6 +80,9 @@ interface WorkoutDao {
     @Query("SELECT COUNT(*) FROM workout_session WHERE isBoss = 1")
     suspend fun bossCount(): Int
 
+    @Query("SELECT COUNT(*) FROM workout_session WHERE dateEpochDay = :day")
+    suspend fun countOnDay(day: Long): Int
+
     @Query(
         "SELECT COALESCE(SUM(xpStrength),0) AS s, COALESCE(SUM(xpEndurance),0) AS e, " +
             "COALESCE(SUM(xpMobility),0) AS m, COALESCE(SUM(xpDiscipline),0) AS d FROM workout_session"

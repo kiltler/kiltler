@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.domain.Analytics
 import com.bodyquest.app.domain.AttributeType
+import com.bodyquest.app.domain.seed.ChallengeCatalog
+import com.bodyquest.app.domain.seed.ChallengeKind
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.CharacterState
 import com.bodyquest.app.ui.art.AssetImageOr
@@ -179,6 +181,36 @@ fun DashboardScreen(
                     else -> Text("Осталось ${goal - done} до недельной цели.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        }
+
+        // Испытание дня
+        run {
+            val today = java.time.LocalDate.now().toEpochDay()
+            val ch = ChallengeCatalog.forDay(today)
+            val done = when (ch.kind) {
+                ChallengeKind.WORKOUT_TODAY -> state.sessions.any { it.dateEpochDay == today }
+                ChallengeKind.WATER_GOAL -> state.waterMl >= (state.nutrition?.waterMlGoal ?: Int.MAX_VALUE)
+                ChallengeKind.LOG_MEASUREMENT -> state.latest?.dateEpochDay == today
+                ChallengeKind.SLEEP_8H -> state.sleepHours >= 8.0
+                ChallengeKind.BEAT_BOSS -> state.sessions.any { it.dateEpochDay == today && it.isBoss }
+            }
+            SectionTitle("Испытание дня")
+            BqCard(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${ch.emoji}  ${ch.title}", style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f))
+                    Text(
+                        if (done) "✅ Выполнено" else "В процессе",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (done) BqSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             }
         }
