@@ -49,8 +49,10 @@ import com.bodyquest.app.ui.components.ConfettiOverlay
 import com.bodyquest.app.ui.components.MeasurementRewardDialog
 import com.bodyquest.app.ui.components.WorkoutRewardDialog
 import com.bodyquest.app.ui.screens.AchievementsScreen
+import com.bodyquest.app.ui.screens.ArticleScreen
 import com.bodyquest.app.ui.screens.DashboardScreen
 import com.bodyquest.app.ui.screens.HistoryScreen
+import com.bodyquest.app.ui.screens.KnowledgeScreen
 import com.bodyquest.app.ui.screens.LibraryScreen
 import com.bodyquest.app.ui.screens.NutritionScreen
 import com.bodyquest.app.ui.screens.OnboardingScreen
@@ -70,6 +72,7 @@ private object Routes {
     const val ACHIEVEMENTS = "achievements"
     const val WORKOUT = "workout"
     const val HISTORY = "history"
+    const val CODEX = "codex"
 }
 
 private data class Tab(
@@ -179,6 +182,7 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                         onStartQuest = { navController.navigate("${Routes.WORKOUT}/$it") },
                         onOpenAchievements = { navController.navigate(Routes.ACHIEVEMENTS) },
                         onOpenLibrary = { navController.navigate(Routes.LIBRARY) },
+                        onOpenCodex = { navController.navigate(Routes.CODEX) },
                         onClaimChallenge = vm::claimDailyChallenge,
                         onFreezeDay = vm::freezeToday,
                     )
@@ -219,6 +223,12 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                 composable(Routes.LIBRARY) { LibraryScreen() }
                 composable(Routes.ACHIEVEMENTS) { AchievementsScreen(state) }
                 composable(Routes.HISTORY) { HistoryScreen(state) }
+                composable(Routes.CODEX) {
+                    KnowledgeScreen(onOpenArticle = { navController.navigate("${Routes.CODEX}/$it") })
+                }
+                composable("${Routes.CODEX}/{articleId}") { entry ->
+                    ArticleScreen(entry.arguments?.getString("articleId") ?: "")
+                }
                 composable("${Routes.WORKOUT}/{dayId}") { entry ->
                     val dayId = entry.arguments?.getString("dayId")
                     val program = state.program

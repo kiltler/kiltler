@@ -122,6 +122,7 @@ fun DashboardScreen(
     onStartQuest: (String) -> Unit,
     onOpenAchievements: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenCodex: () -> Unit,
     onClaimChallenge: (Int) -> Unit,
     onFreezeDay: () -> Unit,
 ) {
@@ -344,6 +345,9 @@ fun DashboardScreen(
             OutlinedButton(onClick = onOpenLibrary, modifier = Modifier.weight(1f)) {
                 Text("Упражнения")
             }
+        }
+        OutlinedButton(onClick = onOpenCodex, modifier = Modifier.fillMaxWidth()) {
+            Text("📚 Кодекс знаний")
         }
     }
 }
