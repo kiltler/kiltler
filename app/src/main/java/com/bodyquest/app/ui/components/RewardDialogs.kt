@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +29,7 @@ import com.bodyquest.app.domain.AttributeType
 import com.bodyquest.app.domain.MeasurementOutcome
 import com.bodyquest.app.domain.Rank
 import com.bodyquest.app.domain.WorkoutOutcome
+import com.bodyquest.app.ui.art.AssetImageOr
 import com.bodyquest.app.ui.theme.BqSecondary
 import com.bodyquest.app.ui.theme.BqTertiary
 
@@ -45,11 +47,14 @@ private fun LevelUpBanner(newLevel: Int) {
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("⭐ НОВЫЙ УРОВЕНЬ ⭐", color = BqTertiary, fontWeight = FontWeight.Black)
+        Box(contentAlignment = Alignment.Center) {
+            // Золотой взрыв сзади (центр пустой специально), текст — поверх.
+            AssetImageOr(name = "fx_levelup", modifier = Modifier.matchParentSize()) {}
+            Column(
+                Modifier.fillMaxWidth().padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("⭐ НОВЫЙ УРОВЕНЬ ⭐", color = BqTertiary, fontWeight = FontWeight.Black)
             Text(
                 "$newLevel",
                 style = MaterialTheme.typography.headlineLarge,
@@ -57,11 +62,12 @@ private fun LevelUpBanner(newLevel: Int) {
                 fontWeight = FontWeight.Black,
                 modifier = Modifier.scale(scale),
             )
-            Text(
-                Rank.forLevel(newLevel).title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
+                Text(
+                    Rank.forLevel(newLevel).title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }

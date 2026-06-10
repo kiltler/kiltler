@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -77,12 +78,10 @@ private fun Badge(a: AchievementUi, progress: Pair<Int, Int>?) {
     ) {
         Box(Modifier.padding(12.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (unlocked) {
-                    AssetImageOr(name = "ach_${a.def.id}", modifier = Modifier.size(48.dp)) {
-                        Text(a.def.emoji, style = MaterialTheme.typography.headlineLarge)
-                    }
-                } else {
-                    Text("🔒", style = MaterialTheme.typography.headlineLarge)
+                // Открытые — цветной бейдж; закрытые — тот же бейдж, но приглушённый.
+                val badgeMod = Modifier.size(48.dp).then(if (unlocked) Modifier else Modifier.alpha(0.3f))
+                AssetImageOr(name = "ach_${a.def.id}", modifier = badgeMod) {
+                    Text(if (unlocked) a.def.emoji else "🔒", style = MaterialTheme.typography.headlineLarge)
                 }
                 Text(
                     a.def.name,

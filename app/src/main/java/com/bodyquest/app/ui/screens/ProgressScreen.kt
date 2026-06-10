@@ -23,6 +23,7 @@ import com.bodyquest.app.domain.ExerciseType
 import com.bodyquest.app.domain.ForecastEngine
 import com.bodyquest.app.domain.PlateauDetector
 import com.bodyquest.app.domain.seed.ExerciseCatalog
+import com.bodyquest.app.ui.art.AssetImageOr
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.components.BqCard
 import com.bodyquest.app.ui.components.DeletableHistoryRow
@@ -217,8 +218,11 @@ fun ProgressScreen(state: AppUiState, onDeleteSession: (Long) -> Unit) {
         BqCard(Modifier.fillMaxWidth()) {
             SectionTitle("Журнал тренировок")
             if (state.sessions.isEmpty()) {
-                Text("Пока нет завершённых тренировок.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                    AssetImageOr("empty_state", Modifier.size(160.dp)) {}
+                    Text("Пока нет завершённых тренировок.",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             } else {
                 state.sessions.take(20).forEach { s ->
                     DeletableHistoryRow(
