@@ -1,22 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- BodyQuest: фиолетовый щит + золотая молния (всё в безопасной зоне 66dp) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Ручка гири -->
-    <path
-        android:strokeColor="#FFB454"
-        android:strokeWidth="9"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M40,58 C40,33 68,33 68,58" />
-    <!-- Корпус гири -->
-    <path
-        android:fillColor="#FFB454"
-        android:pathData="M54,64 m-21,0 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 z" />
-    <!-- Блик-молния (level up) -->
-    <path
-        android:fillColor="#FF2A1E5C"
-        android:pathData="M57,52 L47,68 L54,68 L51,80 L63,62 L55,62 Z" />
+
+    <!-- мягкое свечение позади щита -->
+    <path android:pathData="M54,54m-26,0a26,26 0 1,1 52,0a26,26 0 1,1 -52,0"
+        android:fillColor="#337C5CFF" />
+
+    <!-- щит: градиент фиолетового -->
+    <path android:pathData="M54,28 L74,35 L74,51 C74,64.5 65.5,73.5 54,79 C42.5,73.5 34,64.5 34,51 L34,35 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54" android:startY="28"
+                android:endX="54" android:endY="79"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF9B82FF" />
+                <item android:offset="1.0" android:color="#FF5B3FE0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- внутренняя кромка щита -->
+    <path android:pathData="M54,31.5 L70.8,37.4 L70.8,51 C70.8,62.7 63.6,70.6 54,75.4 C44.4,70.6 37.2,62.7 37.2,51 L37.2,37.4 Z"
+        android:fillColor="#FF141925" />
+
+    <!-- золотая молния -->
+    <path android:pathData="M57.5,38.5 L44.5,58.5 L52.5,58.5 L50,69.5 L63.5,49 L55.5,49 Z"
+        android:fillColor="#FFFFB454" />
 </vector>
