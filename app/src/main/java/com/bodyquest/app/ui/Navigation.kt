@@ -1,18 +1,26 @@
 package com.bodyquest.app.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -41,6 +50,7 @@ import com.bodyquest.app.ui.screens.ProfileScreen
 import com.bodyquest.app.ui.screens.ProgramScreen
 import com.bodyquest.app.ui.screens.ProgressScreen
 import com.bodyquest.app.ui.screens.WorkoutScreen
+import com.bodyquest.app.ui.theme.BqHairline
 
 private object Routes {
     const val DASHBOARD = "dashboard"
@@ -53,14 +63,19 @@ private object Routes {
     const val WORKOUT = "workout"
 }
 
-private data class Tab(val route: String, val label: String, val icon: ImageVector)
+private data class Tab(
+    val route: String,
+    val label: String,
+    val iconSelected: ImageVector,
+    val iconUnselected: ImageVector,
+)
 
 private val tabs = listOf(
-    Tab(Routes.DASHBOARD, "Герой", Icons.Filled.Home),
-    Tab(Routes.PROGRAM, "Программа", Icons.Filled.FitnessCenter),
-    Tab(Routes.PROGRESS, "Прогресс", Icons.Filled.ShowChart),
-    Tab(Routes.NUTRITION, "Питание", Icons.Filled.Restaurant),
-    Tab(Routes.PROFILE, "Профиль", Icons.Filled.Person),
+    Tab(Routes.DASHBOARD, "Герой", Icons.Filled.Home, Icons.Outlined.Home),
+    Tab(Routes.PROGRAM, "Программа", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter),
+    Tab(Routes.PROGRESS, "Прогресс", Icons.AutoMirrored.Filled.ShowChart, Icons.AutoMirrored.Outlined.ShowChart),
+    Tab(Routes.NUTRITION, "Питание", Icons.Filled.Restaurant, Icons.Outlined.Restaurant),
+    Tab(Routes.PROFILE, "Профиль", Icons.Filled.Person, Icons.Outlined.Person),
 )
 
 @Composable
@@ -95,29 +110,45 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
         bottomBar = {
             val backStackEntry by navController.currentBackStackEntryAsState()
             val current = backStackEntry?.destination?.route
-            NavigationBar {
-                tabs.forEach { tab ->
-                    NavigationBarItem(
-                        selected = current == tab.route,
-                        onClick = {
-                            navController.navigate(tab.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = {
-                            Text(
-                                tab.label,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Visible,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        },
-                        alwaysShowLabel = true,
-                    )
+            Column {
+                HorizontalDivider(thickness = 1.dp, color = BqHairline)
+                NavigationBar {
+                    tabs.forEach { tab ->
+                        val selected = current == tab.route
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                navController.navigate(tab.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    if (selected) tab.iconSelected else tab.iconUnselected,
+                                    contentDescription = tab.label,
+                                )
+                            },
+                            label = {
+                                Text(
+                                    tab.label,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Visible,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            },
+                            alwaysShowLabel = true,
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        )
+                    }
                 }
             }
         },
