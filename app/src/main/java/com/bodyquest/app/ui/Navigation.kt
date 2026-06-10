@@ -197,6 +197,7 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                         onExport = vm::exportBackup,
                         onImport = vm::importBackup,
                         onDeleteMeasurement = vm::deleteMeasurement,
+                        onShare = vm::shareProgress,
                         onReset = vm::resetProgress,
                     )
                 }

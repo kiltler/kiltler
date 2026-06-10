@@ -30,6 +30,8 @@ import com.bodyquest.app.domain.WorkoutOutcome
 import com.bodyquest.app.domain.seed.AchievementCatalog
 import com.bodyquest.app.domain.seed.ProgramSeed
 import com.bodyquest.app.notifications.ReminderScheduler
+import com.bodyquest.app.share.ShareImage
+import com.bodyquest.app.share.ShareSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -278,6 +280,32 @@ class BodyQuestViewModel(
     fun claimDailyChallenge(bonusXp: Int) {
         viewModelScope.launch {
             if (repo.claimDailyChallenge(bonusXp)) _message.value = "Испытание выполнено: +$bonusXp XP"
+        }
+    }
+
+    fun shareProgress() {
+        val s = state.value
+        val c = s.character ?: return
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    ShareImage.share(
+                        appContext,
+                        ShareSnapshot(
+                            name = c.name,
+                            rankTitle = c.rank.title,
+                            level = c.overall.level,
+                            streak = s.streak?.current ?: 0,
+                            weightKg = s.latest?.weightKg ?: 0.0,
+                            waistCm = s.latest?.waist ?: 0.0,
+                            unlocked = s.unlockedCount,
+                            totalAch = s.achievements.size,
+                        ),
+                    )
+                }
+            } catch (e: Exception) {
+                _message.value = "Не удалось поделиться: ${e.message}"
+            }
         }
     }
 

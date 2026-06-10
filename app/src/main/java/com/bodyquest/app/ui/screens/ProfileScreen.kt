@@ -52,6 +52,7 @@ fun ProfileScreen(
     onExport: (Uri) -> Unit,
     onImport: (Uri) -> Unit,
     onDeleteMeasurement: (Long) -> Unit,
+    onShare: () -> Unit,
     onReset: () -> Unit,
 ) {
     val exportLauncher = rememberLauncherForActivityResult(
@@ -209,6 +210,10 @@ fun ProfileScreen(
                 onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             ) { Text("Импорт прогресса из файла") }
+            OutlinedButton(
+                onClick = onShare,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) { Text("Поделиться прогрессом (картинка)") }
         }
 
         BqCard(Modifier.fillMaxWidth()) {

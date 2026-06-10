@@ -1,11 +1,5 @@
 package com.bodyquest.app.ui.screens
 
-import android.content.Context
-import android.os.Build
-import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,9 +23,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,6 +40,8 @@ import com.bodyquest.app.domain.LoggedSet
 import com.bodyquest.app.domain.PlannedExercise
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.seed.ExerciseCatalog
+import com.bodyquest.app.notifications.RestTimerController
+import com.bodyquest.app.notifications.RestTimerService
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.art.ExerciseImage
 import com.bodyquest.app.ui.openTechniqueVideo
@@ -55,7 +50,6 @@ import com.bodyquest.app.ui.components.SectionTitle
 import com.bodyquest.app.ui.theme.BqSecondary
 import com.bodyquest.app.ui.theme.BqSurfaceVariant
 import com.bodyquest.app.ui.theme.BqTertiary
-import kotlinx.coroutines.delay
 
 private class SetRow(reps: String, weight: String, time: String) {
     var reps by mutableStateOf(reps)
@@ -65,19 +59,6 @@ private class SetRow(reps: String, weight: String, time: String) {
 
 private fun upperRepBound(target: String): Int =
     Regex("\\d+").findAll(target).map { it.value.toInt() }.maxOrNull() ?: Int.MAX_VALUE
-
-/** Короткая вибрация по окончании отдыха (разрешение VIBRATE уже в манифесте). */
-private fun vibrate(context: Context) {
-    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-    }
-    runCatching {
-        vibrator?.vibrate(VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE))
-    }
-}
 
 @Composable
 fun WorkoutScreen(
@@ -102,34 +83,11 @@ fun WorkoutScreen(
         }
     }
 
-    // Таймер отдыха: считаем по «целевому» elapsedRealtime — отсчёт остаётся точным,
-    // даже если кадр пропущен или экран ненадолго погас. По окончании — вибрация.
-    var restEndsAt by remember { mutableStateOf(0L) }
-    var restRemaining by remember { mutableIntStateOf(0) }
-    LaunchedEffect(restEndsAt) {
-        if (restEndsAt > 0L) {
-            while (true) {
-                val left = restEndsAt - SystemClock.elapsedRealtime()
-                if (left <= 0L) {
-                    restRemaining = 0
-                    vibrate(context)
-                    break
-                }
-                restRemaining = ((left + 999L) / 1000L).toInt()
-                delay(200)
-            }
-            restEndsAt = 0L
-        }
-    }
-    fun startRest(seconds: Int) {
-        if (seconds <= 0) return
-        restRemaining = seconds
-        restEndsAt = SystemClock.elapsedRealtime() + seconds * 1000L
-    }
-    fun stopRest() {
-        restEndsAt = 0L
-        restRemaining = 0
-    }
+    // Таймер отдыха живёт в foreground-service: тикает даже при свёрнутом приложении,
+    // показывает уведомление и вибрирует по окончании. UI лишь читает остаток.
+    val restRemaining by RestTimerController.remaining.collectAsState()
+    fun startRest(seconds: Int) = RestTimerService.start(context, seconds)
+    fun stopRest() = RestTimerService.stop(context)
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -178,6 +136,7 @@ fun WorkoutScreen(
                             Toast.LENGTH_SHORT,
                         ).show()
                     } else {
+                        stopRest()
                         val duration = ((System.currentTimeMillis() - startMillis) / 1000).toInt()
                         onFinish(day, logged, duration)
                     }
@@ -185,7 +144,7 @@ fun WorkoutScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Завершить тренировку", fontWeight = FontWeight.Bold) }
 
-            TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Отмена") }
+            TextButton(onClick = { stopRest(); onCancel() }, modifier = Modifier.fillMaxWidth()) { Text("Отмена") }
         }
 
         if (restRemaining > 0) {
