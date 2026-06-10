@@ -53,6 +53,7 @@ fun ProfileScreen(
     onImport: (Uri) -> Unit,
     onDeleteMeasurement: (Long) -> Unit,
     onShare: () -> Unit,
+    onOpenHistory: () -> Unit,
     onReset: () -> Unit,
 ) {
     val exportLauncher = rememberLauncherForActivityResult(
@@ -92,6 +93,10 @@ fun ProfileScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Профиль и настройки", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+
+        OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
+            Text("🏛️ Зал славы (ранги и рекорды)")
+        }
 
         BqCard(Modifier.fillMaxWidth()) {
             SectionTitle("Герой")

@@ -6,6 +6,7 @@ import com.bodyquest.app.domain.Leveling
 import com.bodyquest.app.domain.LoggedSet
 import com.bodyquest.app.domain.MeasurementOutcome
 import com.bodyquest.app.domain.Rank
+import com.bodyquest.app.domain.Streaks
 import com.bodyquest.app.domain.WorkoutDay
 import com.bodyquest.app.domain.WorkoutOutcome
 import com.bodyquest.app.domain.WorkoutScoring
@@ -189,12 +190,7 @@ class Repository(private val db: AppDatabase) {
 
         // Серия дней
         val streak = streakDao.get() ?: StreakEntity()
-        val newStreak = when {
-            streak.lastWorkoutEpochDay < 0 -> 1
-            streak.lastWorkoutEpochDay == today -> streak.current.coerceAtLeast(1)
-            streak.lastWorkoutEpochDay == today - 1 -> streak.current + 1
-            else -> 1
-        }
+        val newStreak = Streaks.nextStreak(streak.lastWorkoutEpochDay, streak.current, today)
         val longest = max(streak.longest, newStreak)
         val multiplier = Leveling.streakMultiplier(newStreak)
 

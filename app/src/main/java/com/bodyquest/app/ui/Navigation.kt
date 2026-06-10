@@ -47,6 +47,7 @@ import com.bodyquest.app.ui.components.MeasurementRewardDialog
 import com.bodyquest.app.ui.components.WorkoutRewardDialog
 import com.bodyquest.app.ui.screens.AchievementsScreen
 import com.bodyquest.app.ui.screens.DashboardScreen
+import com.bodyquest.app.ui.screens.HistoryScreen
 import com.bodyquest.app.ui.screens.LibraryScreen
 import com.bodyquest.app.ui.screens.NutritionScreen
 import com.bodyquest.app.ui.screens.OnboardingScreen
@@ -65,6 +66,7 @@ private object Routes {
     const val LIBRARY = "library"
     const val ACHIEVEMENTS = "achievements"
     const val WORKOUT = "workout"
+    const val HISTORY = "history"
 }
 
 private data class Tab(
@@ -198,11 +200,13 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
                         onImport = vm::importBackup,
                         onDeleteMeasurement = vm::deleteMeasurement,
                         onShare = vm::shareProgress,
+                        onOpenHistory = { navController.navigate(Routes.HISTORY) },
                         onReset = vm::resetProgress,
                     )
                 }
                 composable(Routes.LIBRARY) { LibraryScreen() }
                 composable(Routes.ACHIEVEMENTS) { AchievementsScreen(state) }
+                composable(Routes.HISTORY) { HistoryScreen(state) }
                 composable("${Routes.WORKOUT}/{dayId}") { entry ->
                     val dayId = entry.arguments?.getString("dayId")
                     val program = state.program
