@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bodyquest.app.data.SetEntity
+import com.bodyquest.app.domain.Analytics
 import com.bodyquest.app.domain.AttributeType
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.components.BqCard
@@ -29,7 +30,9 @@ import com.bodyquest.app.ui.components.SingleLineChart
 import com.bodyquest.app.ui.components.XpBar
 import com.bodyquest.app.ui.theme.AttrEndurance
 import com.bodyquest.app.ui.theme.AttrStrength
+import com.bodyquest.app.ui.theme.BqDanger
 import com.bodyquest.app.ui.theme.BqSecondary
+import com.bodyquest.app.ui.theme.BqSuccess
 import com.bodyquest.app.ui.theme.BqTertiary
 
 private fun sessionMaxWeight(sets: List<SetEntity>, exerciseId: String): List<Float> =
@@ -52,6 +55,38 @@ fun ProgressScreen(state: AppUiState, onDeleteSession: (Long) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Прогресс", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+
+        // Динамика за 30 дней + тоннаж + V-силуэт
+        run {
+            val today = java.time.LocalDate.now().toEpochDay()
+            fun d(sel: (com.bodyquest.app.data.MeasurementEntity) -> Double): Double? =
+                Analytics.deltaOverDays(m.map { it.dateEpochDay to sel(it) }, today, 30)
+            val now = System.currentTimeMillis()
+            val weekAgo = now - 7L * 86_400_000L
+            val tonnage = state.sets.filter { it.dateMillis >= weekAgo }.sumOf { it.reps * it.weightKg }
+            val latest = state.latest
+            val vRatio = if (latest != null && latest.waist > 0) latest.shoulders / latest.waist else null
+
+            BqCard(Modifier.fillMaxWidth()) {
+                SectionTitle("Динамика за 30 дней")
+                TrendRow("Вес", d { it.weightKg }, "кг", lowerIsBetter = true)
+                TrendRow("Талия", d { it.waist }, "см", lowerIsBetter = true)
+                TrendRow("Живот", d { it.belly }, "см", lowerIsBetter = true)
+                TrendRow("Грудь", d { it.chest }, "см", lowerIsBetter = false)
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Тоннаж за 7 дней", style = MaterialTheme.typography.bodyMedium)
+                    Text("${tonnage.toInt()} кг", fontWeight = FontWeight.Bold, color = BqSecondary)
+                }
+                if (vRatio != null) {
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Силуэт V (плечи/талия)", style = MaterialTheme.typography.bodyMedium)
+                        Text("${(vRatio * 100).toInt()}%", fontWeight = FontWeight.Bold, color = BqTertiary)
+                    }
+                    Text("Цель — растить это число: шире плечи, уже талия.",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
 
         BqCard(Modifier.fillMaxWidth()) {
             SectionTitle("Вес по времени, кг")
@@ -130,6 +165,36 @@ fun ProgressScreen(state: AppUiState, onDeleteSession: (Long) -> Unit) {
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun TrendRow(label: String, delta: Double?, unit: String, lowerIsBetter: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        if (delta == null) {
+            Text("— нет данных", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            val arrow = when {
+                delta < -0.05 -> "▼"
+                delta > 0.05 -> "▲"
+                else -> "→"
+            }
+            val good = (lowerIsBetter && delta < -0.05) || (!lowerIsBetter && delta > 0.05)
+            val neutral = kotlin.math.abs(delta) <= 0.05
+            val color = if (neutral) MaterialTheme.colorScheme.onSurfaceVariant
+            else if (good) BqSuccess else BqDanger
+            Text(
+                "$arrow ${String.format("%+.1f", delta)} $unit",
+                style = MaterialTheme.typography.labelLarge,
+                color = color,
+                fontWeight = FontWeight.Bold,
+            )
         }
     }
 }

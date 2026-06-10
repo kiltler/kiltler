@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bodyquest.app.domain.Analytics
 import com.bodyquest.app.domain.AttributeType
 import com.bodyquest.app.ui.AppUiState
 import com.bodyquest.app.ui.CharacterState
@@ -41,7 +42,11 @@ import com.bodyquest.app.ui.theme.BqTertiary
 @Composable
 fun CharacterCard(character: CharacterState) {
     var showRanks by remember { mutableStateOf(false) }
-    if (showRanks) RankSystemDialog(currentRank = character.rank, onDismiss = { showRanks = false })
+    if (showRanks) RankSystemDialog(
+        currentRank = character.rank,
+        currentLevel = character.overall.level,
+        onDismiss = { showRanks = false },
+    )
 
     BqCard(Modifier.fillMaxWidth()) {
         Row(
@@ -144,6 +149,36 @@ fun DashboardScreen(
                     color = BqSecondary, modifier = Modifier.padding(top = 6.dp))
                 Button(onClick = { onStartQuest(quest.id) }, modifier = Modifier.padding(top = 10.dp).fillMaxWidth()) {
                     Text("Начать тренировку", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Недельная сводка + deload
+        run {
+            val today = java.time.LocalDate.now().toEpochDay()
+            val done = Analytics.sessionsThisWeek(state.sessions.map { it.dateEpochDay }, today)
+            val goal = (state.profile?.daysPerWeek ?: 3).coerceAtLeast(1)
+            val startDay = state.first?.dateEpochDay ?: today
+            val weeks = Analytics.weeksSince(startDay, today)
+            val deload = Analytics.isDeloadWeek(weeks)
+            SectionTitle("Неделя ${weeks + 1}")
+            BqCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Тренировки недели", style = MaterialTheme.typography.bodyMedium)
+                    Text("$done / $goal", fontWeight = FontWeight.Black, color = BqSecondary)
+                }
+                XpBar((done.toFloat() / goal).coerceIn(0f, 1f), color = BqSecondary,
+                    modifier = Modifier.padding(top = 8.dp))
+                when {
+                    deload -> Text("🪶 Неделя разгрузки: снизь объём на ~40%, веса полегче — это часть прогресса.",
+                        style = MaterialTheme.typography.bodySmall, color = BqTertiary,
+                        modifier = Modifier.padding(top = 8.dp))
+                    done >= goal -> Text("✅ Недельная цель выполнена! Самое время на Босса.",
+                        style = MaterialTheme.typography.bodySmall, color = BqSecondary,
+                        modifier = Modifier.padding(top = 8.dp))
+                    else -> Text("Осталось ${goal - done} до недельной цели.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp))
                 }
             }
         }

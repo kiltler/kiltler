@@ -28,6 +28,9 @@ import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -39,6 +42,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.bodyquest.app.domain.seed.ProgramSeed
+import com.bodyquest.app.ui.components.ConfettiOverlay
 import com.bodyquest.app.ui.components.MeasurementRewardDialog
 import com.bodyquest.app.ui.components.WorkoutRewardDialog
 import com.bodyquest.app.ui.screens.AchievementsScreen
@@ -99,6 +103,8 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
     val measurementOutcome by vm.measurementOutcome.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showConfetti by remember { mutableStateOf(false) }
+    LaunchedEffect(workoutOutcome) { if (workoutOutcome != null) showConfetti = true }
     LaunchedEffect(message) {
         message?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
@@ -222,6 +228,7 @@ private fun MainScaffold(vm: BodyQuestViewModel, state: AppUiState) {
 
             workoutOutcome?.let { WorkoutRewardDialog(it, onDismiss = vm::clearWorkoutOutcome) }
             measurementOutcome?.let { MeasurementRewardDialog(it, onDismiss = vm::clearMeasurementOutcome) }
+            if (showConfetti) ConfettiOverlay(onDone = { showConfetti = false })
         }
     }
 }

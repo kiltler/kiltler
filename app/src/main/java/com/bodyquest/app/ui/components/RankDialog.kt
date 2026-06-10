@@ -27,7 +27,7 @@ import com.bodyquest.app.ui.theme.BqSurfaceVariant
 import com.bodyquest.app.ui.theme.BqTertiary
 
 @Composable
-fun RankSystemDialog(currentRank: Rank, onDismiss: () -> Unit) {
+fun RankSystemDialog(currentRank: Rank, currentLevel: Int, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } },
@@ -66,6 +66,8 @@ fun RankSystemDialog(currentRank: Rank, onDismiss: () -> Unit) {
                                     )
                                     if (isCurrent) {
                                         Text("  • ты здесь", style = MaterialTheme.typography.labelSmall, color = BqTertiary)
+                                    } else if (currentLevel >= rank.minLevel) {
+                                        Text("  ✓ пройден", style = MaterialTheme.typography.labelSmall, color = BqTertiary)
                                     }
                                 }
                                 Text("Уровни ${rank.minLevel}+", style = MaterialTheme.typography.labelSmall,

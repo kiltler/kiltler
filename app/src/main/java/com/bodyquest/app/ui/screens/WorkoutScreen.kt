@@ -93,8 +93,11 @@ fun WorkoutScreen(
     val sheets = remember(day.id) {
         day.exercises.map { planned ->
             val pr = state.prs[planned.exerciseId]
-            val defWeight = pr?.lastWeight?.takeIf { it > 0 }?.let { it.toString() } ?: ""
-            val rows = (0 until planned.sets).map { SetRow("", defWeight, "") }.toMutableStateList()
+            // Префилл из прошлой тренировки — «повтор в один тап», значения легко поправить.
+            val defWeight = pr?.lastWeight?.takeIf { it > 0 }?.toString() ?: ""
+            val defReps = pr?.lastReps?.takeIf { it > 0 }?.toString() ?: ""
+            val defTime = pr?.lastTimeSeconds?.takeIf { it > 0 }?.toString() ?: ""
+            val rows = (0 until planned.sets).map { SetRow(defReps, defWeight, defTime) }.toMutableStateList()
             planned to rows
         }
     }

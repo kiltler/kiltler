@@ -55,7 +55,19 @@ class ReminderScheduler(private val context: Context) {
     fun scheduleWater(enabled: Boolean) {
         if (enabled) {
             ensureChannel()
-            scheduleDaily(WATER_REQUEST, KIND_WATER, 12, 0)
+            // Периодически в течение дня (каждые ~3 часа), а не один раз в полдень.
+            val am = context.getSystemService(AlarmManager::class.java) ?: return
+            val intervalMs = 3 * 60 * 60 * 1000L
+            try {
+                am.setInexactRepeating(
+                    AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + intervalMs,
+                    intervalMs,
+                    pendingIntent(WATER_REQUEST, KIND_WATER),
+                )
+            } catch (_: SecurityException) {
+                // ignore
+            }
         } else {
             cancel(WATER_REQUEST, KIND_WATER)
         }
